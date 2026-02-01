@@ -203,14 +203,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showToast(_ message: String) {
         TLNTLogger.debug("showToast called with message: '\(message)'", category: TLNTLogger.ui)
-
-        DispatchQueue.main.async {
-            TLNTLogger.debug("Creating ToastWindow on main thread...", category: TLNTLogger.ui)
-            let toast = ToastWindow(message: message)
-            TLNTLogger.debug("Calling toast.showAndDismiss()...", category: TLNTLogger.ui)
-            toast.showAndDismiss()
-            TLNTLogger.debug("Toast displayed", category: TLNTLogger.ui)
-        }
+        ToastManager.shared.showToast(message)
     }
 
     // MARK: - Onboarding
