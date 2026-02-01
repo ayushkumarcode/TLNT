@@ -79,8 +79,8 @@ struct MainContentView: View {
                 .foregroundColor(.secondary)
 
             VStack(spacing: 8) {
-                HotkeyHint(keys: "⌘⌥S", description: "Send screenshot")
-                HotkeyHint(keys: "⌘⌥K", description: "Capture text")
+                HotkeyHint(keys: "⌘⇧S", description: "Send screenshot")
+                HotkeyHint(keys: "⌘⇧K", description: "Capture text")
             }
             .padding(.top, 8)
         }

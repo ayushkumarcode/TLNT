@@ -95,9 +95,9 @@ struct OnboardingView: View {
                 Text("Hotkeys")
                     .font(.headline)
 
-                HotkeyRow(keys: "⌘⌥S", description: "Send next screenshot to TLNT")
-                HotkeyRow(keys: "⌘⌥K", description: "Capture selected text")
-                HotkeyRow(keys: "⌘⌥L", description: "Open TLNT window")
+                HotkeyRow(keys: "⌘⇧S", description: "Send next screenshot to TLNT")
+                HotkeyRow(keys: "⌘⇧K", description: "Capture selected text")
+                HotkeyRow(keys: "⌘⇧L", description: "Open TLNT window")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 32)
