@@ -120,14 +120,13 @@ struct OnboardingView: View {
     }
 
     private func requestPermission() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
-        let trusted = AXIsProcessTrustedWithOptions(options)
-        accessibilityGranted = trusted
-
-        // Poll for permission grant since the system dialog is async
-        if !trusted {
-            pollForPermission()
+        // Open System Settings directly to Accessibility > Privacy
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
         }
+
+        // Poll for permission grant since user needs to toggle it manually
+        pollForPermission()
     }
 
     private func checkPermission() {

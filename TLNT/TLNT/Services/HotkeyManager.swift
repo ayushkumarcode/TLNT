@@ -12,11 +12,15 @@ class HotkeyManager {
     private var sendScreenshotHotkey: HotKey?
     private var captureTextHotkey: HotKey?
     private var openWindowHotkey: HotKey?
+    private var cycleTabHotkey: HotKey?
+    private var undoHotkey: HotKey?
 
     // Callbacks
     var onSendScreenshot: (() -> Void)?
     var onCaptureText: (() -> Void)?
     var onOpenWindow: (() -> Void)?
+    var onCycleTab: (() -> Void)?
+    var onUndo: (() -> Void)?
 
     init() {
         TLNTLogger.debug("HotkeyManager.init() called", category: TLNTLogger.hotkey)
@@ -52,6 +56,24 @@ class HotkeyManager {
         }
         TLNTLogger.success("⌘⇧L registered", category: TLNTLogger.hotkey)
 
+        // ⌘⇧J - Cycle through tabs (Command + Shift + J)
+        TLNTLogger.debug("Registering ⌘⇧J for cycle tab...", category: TLNTLogger.hotkey)
+        cycleTabHotkey = HotKey(key: .j, modifiers: [.command, .shift])
+        cycleTabHotkey?.keyDownHandler = { [weak self] in
+            TLNTLogger.info("⌘⇧J pressed - cycle tab hotkey", category: TLNTLogger.hotkey)
+            self?.onCycleTab?()
+        }
+        TLNTLogger.success("⌘⇧J registered", category: TLNTLogger.hotkey)
+
+        // ⌘⇧Z - Undo resize (Command + Shift + Z to avoid conflict with system Cmd+Z)
+        TLNTLogger.debug("Registering ⌘⇧Z for undo...", category: TLNTLogger.hotkey)
+        undoHotkey = HotKey(key: .z, modifiers: [.command, .shift])
+        undoHotkey?.keyDownHandler = { [weak self] in
+            TLNTLogger.info("⌘⇧Z pressed - undo hotkey", category: TLNTLogger.hotkey)
+            self?.onUndo?()
+        }
+        TLNTLogger.success("⌘⇧Z registered", category: TLNTLogger.hotkey)
+
         TLNTLogger.success("All hotkeys registered successfully", category: TLNTLogger.hotkey)
     }
 
@@ -60,6 +82,8 @@ class HotkeyManager {
         sendScreenshotHotkey = nil
         captureTextHotkey = nil
         openWindowHotkey = nil
+        cycleTabHotkey = nil
+        undoHotkey = nil
         TLNTLogger.debug("All hotkeys released", category: TLNTLogger.hotkey)
     }
 }

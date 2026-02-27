@@ -11,10 +11,12 @@ import SwiftUI
 class MainWindowController {
     private var window: NSWindow?
     private let noteStore: NoteStore
+    private let tabStore: TabStore
     private var scrollToId: UUID?
 
-    init(noteStore: NoteStore) {
+    init(noteStore: NoteStore, tabStore: TabStore) {
         self.noteStore = noteStore
+        self.tabStore = tabStore
     }
 
     func show() {
@@ -32,7 +34,7 @@ class MainWindowController {
     }
 
     private func createWindow() {
-        let contentView = MainContentView(noteStore: noteStore)
+        let contentView = MainContentView(noteStore: noteStore, tabStore: tabStore)
 
         window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 900, height: 700),

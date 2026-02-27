@@ -19,6 +19,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // Services
     private var noteStore: NoteStore!
+    private var tabStore: TabStore!
     private var hashStore: HashStore!
     private var screenshotWatcher: ScreenshotWatcher!
     private var textCaptureService: TextCaptureService!
@@ -36,6 +37,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         noteStore = NoteStore()
         TLNTLogger.success("NoteStore initialized with \(noteStore.notes.count) notes", category: TLNTLogger.storage)
 
+        TLNTLogger.debug("Initializing TabStore...", category: TLNTLogger.storage)
+        tabStore = TabStore()
+        TLNTLogger.success("TabStore initialized with \(tabStore.tabs.count) tabs", category: TLNTLogger.storage)
+
         TLNTLogger.debug("Initializing HashStore...", category: TLNTLogger.storage)
         hashStore = HashStore()
         TLNTLogger.success("HashStore initialized", category: TLNTLogger.storage)
@@ -46,11 +51,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Initialize services
         TLNTLogger.debug("Initializing ScreenshotWatcher...", category: TLNTLogger.screenshot)
-        screenshotWatcher = ScreenshotWatcher(noteStore: noteStore, hashStore: hashStore, spotlightIndexer: spotlightIndexer)
+        screenshotWatcher = ScreenshotWatcher(noteStore: noteStore, tabStore: tabStore, hashStore: hashStore, spotlightIndexer: spotlightIndexer)
         TLNTLogger.success("ScreenshotWatcher initialized", category: TLNTLogger.screenshot)
 
         TLNTLogger.debug("Initializing TextCaptureService...", category: TLNTLogger.text)
-        textCaptureService = TextCaptureService(noteStore: noteStore, spotlightIndexer: spotlightIndexer)
+        textCaptureService = TextCaptureService(noteStore: noteStore, tabStore: tabStore, spotlightIndexer: spotlightIndexer)
         TLNTLogger.success("TextCaptureService initialized", category: TLNTLogger.text)
 
         // Setup UI
@@ -142,6 +147,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.openTLNT()
         }
 
+        hotkeyManager.onCycleTab = { [weak self] in
+            TLNTLogger.info("Cycle tab hotkey triggered", category: TLNTLogger.hotkey)
+            self?.cycleTab()
+        }
+
+        hotkeyManager.onUndo = { [weak self] in
+            TLNTLogger.info("Undo hotkey triggered", category: TLNTLogger.hotkey)
+            self?.noteStore.undo()
+        }
+
         TLNTLogger.debug("Calling hotkeyManager.setup()...", category: TLNTLogger.hotkey)
         hotkeyManager.setup()
         TLNTLogger.success("HotkeyManager setup complete", category: TLNTLogger.hotkey)
@@ -154,13 +169,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         if mainWindowController == nil {
             TLNTLogger.debug("Creating new MainWindowController...", category: TLNTLogger.ui)
-            mainWindowController = MainWindowController(noteStore: noteStore)
+            mainWindowController = MainWindowController(noteStore: noteStore, tabStore: tabStore)
             TLNTLogger.debug("MainWindowController created", category: TLNTLogger.ui)
         }
 
         TLNTLogger.debug("Showing main window...", category: TLNTLogger.ui)
         mainWindowController?.show()
         TLNTLogger.success("Main window shown", category: TLNTLogger.ui)
+    }
+
+    private func cycleTab() {
+        TLNTLogger.info("=== cycleTab START ===", category: TLNTLogger.ui)
+
+        if let nextTab = tabStore.cycleToNextTab() {
+            TLNTLogger.success("Switched to tab: \(nextTab.name)", category: TLNTLogger.ui)
+            showToast("📁 \(nextTab.name)")
+        }
+
+        TLNTLogger.info("=== cycleTab END ===", category: TLNTLogger.ui)
     }
 
     @objc private func sendScreenshot() {
@@ -184,6 +210,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func captureText() {
         TLNTLogger.info("=== captureText START ===", category: TLNTLogger.text)
 
+        // Check accessibility permission first
+        if !textCaptureService.hasAccessibilityPermission {
+            TLNTLogger.warning("No accessibility permission - prompting user", category: TLNTLogger.text)
+            showToast("Enable Accessibility in System Settings")
+            // Prompt the system dialog
+            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
+            AXIsProcessTrustedWithOptions(options)
+            return
+        }
+
         TLNTLogger.debug("Calling textCaptureService.captureSelectedText()...", category: TLNTLogger.text)
         textCaptureService.captureSelectedText { [weak self] success in
             TLNTLogger.debug("captureSelectedText callback received, success: \(success)", category: TLNTLogger.text)
@@ -192,7 +228,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 TLNTLogger.success("Text captured successfully", category: TLNTLogger.text)
                 self?.showToast("Text captured")
             } else {
-                TLNTLogger.warning("Text capture failed or no text selected", category: TLNTLogger.text)
+                TLNTLogger.warning("Text capture failed - no text selected?", category: TLNTLogger.text)
+                self?.showToast("No text selected")
             }
         }
 

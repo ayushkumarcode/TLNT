@@ -9,12 +9,14 @@ import Foundation
 
 class ScreenshotWatcher {
     private let noteStore: NoteStore
+    private let tabStore: TabStore
     private let hashStore: HashStore
     private let spotlightIndexer: SpotlightIndexer
 
-    init(noteStore: NoteStore, hashStore: HashStore, spotlightIndexer: SpotlightIndexer) {
+    init(noteStore: NoteStore, tabStore: TabStore, hashStore: HashStore, spotlightIndexer: SpotlightIndexer) {
         TLNTLogger.debug("ScreenshotWatcher.init() called", category: TLNTLogger.screenshot)
         self.noteStore = noteStore
+        self.tabStore = tabStore
         self.hashStore = hashStore
         self.spotlightIndexer = spotlightIndexer
         TLNTLogger.debug("ScreenshotWatcher initialized", category: TLNTLogger.screenshot)
@@ -103,13 +105,17 @@ class ScreenshotWatcher {
         let type: Note.NoteType = ext == "mov" ? .recording : .screenshot
         TLNTLogger.debug("Note type: \(type)", category: TLNTLogger.screenshot)
 
+        // Save to active tab (nil for home tab)
+        let tabId: UUID? = tabStore.activeTab?.isHome == true ? nil : tabStore.activeTabId
+
         TLNTLogger.debug("Creating Note object...", category: TLNTLogger.screenshot)
         let note = Note(
             type: type,
             content: file.path,
-            hash: hash
+            hash: hash,
+            tabId: tabId
         )
-        TLNTLogger.debug("Note created with id: \(note.id)", category: TLNTLogger.screenshot)
+        TLNTLogger.debug("Note created with id: \(note.id), tabId: \(tabId?.uuidString ?? "nil")", category: TLNTLogger.screenshot)
 
         TLNTLogger.debug("Adding note to noteStore...", category: TLNTLogger.screenshot)
         noteStore.add(note)
