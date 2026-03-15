@@ -83,30 +83,53 @@ struct BookCoverView: View {
 
     private var grainOverlay: some View {
         Canvas { context, canvasSize in
-            // Procedural leather grain using pseudo-random noise
-            let step: CGFloat = 3
+            // Procedural leather grain — fine pebble texture
+            let step: CGFloat = 2.5
             for x in stride(from: 0, to: canvasSize.width, by: step) {
                 for y in stride(from: 0, to: canvasSize.height, by: step) {
                     let noise = sin(x * 12.9898 + y * 78.233) * 43758.5453
                     let frac = noise - floor(noise)
-                    if frac > 0.6 {
-                        let opacity = (frac - 0.6) * 0.15
-                        let rect = CGRect(x: x, y: y, width: step * 0.8, height: step * 0.8)
-                        context.fill(
-                            Path(ellipseIn: rect),
-                            with: .color(Color.white.opacity(opacity))
-                        )
+
+                    // Light grain highlights (pebble peaks)
+                    if frac > 0.55 {
+                        let opacity = (frac - 0.55) * 0.12
+                        let rect = CGRect(x: x, y: y, width: step * 0.7, height: step * 0.7)
+                        context.fill(Path(ellipseIn: rect), with: .color(Color.white.opacity(opacity)))
                     }
-                    if frac < 0.15 {
-                        let opacity = (0.15 - frac) * 0.2
-                        let rect = CGRect(x: x, y: y, width: step * 1.2, height: step * 0.6)
-                        context.fill(
-                            Path(ellipseIn: rect),
-                            with: .color(Color.black.opacity(opacity))
-                        )
+
+                    // Dark grain valleys
+                    if frac < 0.2 {
+                        let opacity = (0.2 - frac) * 0.15
+                        let rect = CGRect(x: x, y: y, width: step * 1.0, height: step * 0.5)
+                        context.fill(Path(ellipseIn: rect), with: .color(Color.black.opacity(opacity)))
+                    }
+
+                    // Cross-hatch grain (diagonal lines for leather texture)
+                    let noise2 = sin(x * 7.456 + y * 23.111) * 12345.6789
+                    let frac2 = noise2 - floor(noise2)
+                    if frac2 > 0.85 {
+                        var line = Path()
+                        line.move(to: CGPoint(x: x, y: y))
+                        line.addLine(to: CGPoint(x: x + step * 2, y: y + step))
+                        context.stroke(line, with: .color(Color.black.opacity(0.04)), lineWidth: 0.3)
                     }
                 }
             }
+
+            // Edge darkening (vignette on the cover)
+            let edgeInset: CGFloat = 8
+            let topGrad = CGRect(x: 0, y: 0, width: canvasSize.width, height: edgeInset)
+            context.fill(Path(topGrad), with: .linearGradient(
+                Gradient(colors: [Color.black.opacity(0.12), Color.clear]),
+                startPoint: CGPoint(x: 0, y: 0),
+                endPoint: CGPoint(x: 0, y: edgeInset)
+            ))
+            let bottomGrad = CGRect(x: 0, y: canvasSize.height - edgeInset, width: canvasSize.width, height: edgeInset)
+            context.fill(Path(bottomGrad), with: .linearGradient(
+                Gradient(colors: [Color.clear, Color.black.opacity(0.12)]),
+                startPoint: CGPoint(x: 0, y: canvasSize.height - edgeInset),
+                endPoint: CGPoint(x: 0, y: canvasSize.height)
+            ))
         }
         .clipShape(RoundedRectangle(cornerRadius: 3))
         .allowsHitTesting(false)

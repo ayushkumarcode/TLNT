@@ -19,6 +19,9 @@ struct JournalBookView: View {
     @State private var pageFlipAngle: Double = 0
     @State private var isFlippingForward = false
     @State private var isFlippingBackward = false
+    @State private var isSearching = false
+    @State private var searchQuery = ""
+    @State private var searchResults: [JournalPage] = []
 
     var body: some View {
         GeometryReader { geometry in
@@ -70,6 +73,7 @@ struct JournalBookView: View {
 
     // MARK: - Top Bar
 
+    @ViewBuilder
     private var topBar: some View {
         HStack {
             Button(action: closeBook) {
@@ -91,6 +95,23 @@ struct JournalBookView: View {
 
             Spacer()
 
+            // Search button
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isSearching.toggle()
+                    if !isSearching {
+                        searchQuery = ""
+                        searchResults = []
+                    }
+                }
+            }) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(Color(red: 0.50, green: 0.42, blue: 0.32))
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut("f", modifiers: .command)
+
             // Page indicator
             Text("Page \(currentPageIndex + 1) of \(pages.count)")
                 .font(.system(size: 11, design: .serif))
@@ -99,6 +120,11 @@ struct JournalBookView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(Color(red: 0.96, green: 0.93, blue: 0.87))
+
+        // Search overlay
+        if isSearching {
+            searchOverlay
+        }
     }
 
     // MARK: - Pages
@@ -262,6 +288,38 @@ struct JournalBookView: View {
                     context.stroke(path, with: .color(Color(red: 0.85, green: 0.82, blue: 0.78).opacity(0.4)), lineWidth: 0.5)
                     y += lineSpacing
                 }
+
+                // Subtle paper fiber noise
+                let step: CGFloat = 4
+                for x in stride(from: 0, to: canvasSize.width, by: step) {
+                    for yi in stride(from: 0, to: canvasSize.height, by: step) {
+                        let noise = sin(x * 5.123 + yi * 11.456) * 43758.5453
+                        let frac = noise - floor(noise)
+                        if frac > 0.92 {
+                            let rect = CGRect(x: x, y: yi, width: step * 0.5, height: step * 0.3)
+                            context.fill(Path(ellipseIn: rect), with: .color(Color(red: 0.85, green: 0.82, blue: 0.75).opacity(0.15)))
+                        }
+                    }
+                }
+            }
+
+            // Paper aging — darker edges
+            VStack(spacing: 0) {
+                LinearGradient(
+                    colors: [Color(red: 0.92, green: 0.88, blue: 0.78).opacity(0.3), Color.clear],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 20)
+
+                Spacer()
+
+                LinearGradient(
+                    colors: [Color.clear, Color(red: 0.92, green: 0.88, blue: 0.78).opacity(0.3)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 20)
             }
         }
     }
@@ -362,6 +420,100 @@ struct JournalBookView: View {
                     perspective: 0.4
                 )
                 .position(x: geometry.size.width * 0.5, y: geometry.size.height * 0.5)
+        }
+    }
+
+    // MARK: - Search
+
+    private var searchOverlay: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(Color(red: 0.50, green: 0.42, blue: 0.32))
+                    .font(.system(size: 12))
+
+                TextField("Search pages...", text: $searchQuery)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13, design: .serif))
+                    .onChange(of: searchQuery) { _, query in
+                        searchResults = journalStore.searchPages(in: journal.id, query: query)
+                    }
+
+                if !searchQuery.isEmpty {
+                    Button(action: {
+                        searchQuery = ""
+                        searchResults = []
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                            .font(.system(size: 12))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Button("Done") {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isSearching = false
+                        searchQuery = ""
+                        searchResults = []
+                    }
+                }
+                .font(.system(size: 12, weight: .medium))
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color(red: 0.94, green: 0.91, blue: 0.85))
+
+            // Search results
+            if !searchQuery.isEmpty {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if searchResults.isEmpty {
+                            Text("No matches found")
+                                .font(.system(size: 12, design: .serif))
+                                .foregroundColor(.secondary)
+                                .padding(12)
+                        } else {
+                            ForEach(searchResults) { page in
+                                Button(action: {
+                                    // Navigate to the matching page
+                                    if let index = pages.firstIndex(where: { $0.id == page.id }) {
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                            currentPageIndex = index
+                                        }
+                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                            isSearching = false
+                                            searchQuery = ""
+                                            searchResults = []
+                                        }
+                                    }
+                                }) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Page \(page.pageNumber)")
+                                            .font(.system(size: 11, weight: .semibold, design: .serif))
+                                            .foregroundColor(Color(red: 0.30, green: 0.22, blue: 0.12))
+
+                                        Text(page.content.prefix(100) + (page.content.count > 100 ? "..." : ""))
+                                            .font(.system(size: 11, design: .serif))
+                                            .foregroundColor(Color(red: 0.50, green: 0.42, blue: 0.32))
+                                            .lineLimit(2)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 6)
+                                }
+                                .buttonStyle(.plain)
+
+                                Divider()
+                                    .padding(.horizontal, 16)
+                            }
+                        }
+                    }
+                }
+                .frame(maxHeight: 200)
+                .background(Color(red: 0.97, green: 0.95, blue: 0.90))
+            }
         }
     }
 
