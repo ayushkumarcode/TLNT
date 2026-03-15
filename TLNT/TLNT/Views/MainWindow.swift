@@ -13,12 +13,14 @@ class MainWindowController {
     private let noteStore: NoteStore
     private let tabStore: TabStore
     private let appModeStore: AppModeStore
+    private let journalStore: JournalStore
     private var scrollToId: UUID?
 
-    init(noteStore: NoteStore, tabStore: TabStore, appModeStore: AppModeStore) {
+    init(noteStore: NoteStore, tabStore: TabStore, appModeStore: AppModeStore, journalStore: JournalStore) {
         self.noteStore = noteStore
         self.tabStore = tabStore
         self.appModeStore = appModeStore
+        self.journalStore = journalStore
     }
 
     func show() {
@@ -36,7 +38,7 @@ class MainWindowController {
     }
 
     private func createWindow() {
-        let contentView = RootContentView(noteStore: noteStore, tabStore: tabStore, appModeStore: appModeStore)
+        let contentView = RootContentView(noteStore: noteStore, tabStore: tabStore, appModeStore: appModeStore, journalStore: journalStore)
 
         window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 900, height: 700),

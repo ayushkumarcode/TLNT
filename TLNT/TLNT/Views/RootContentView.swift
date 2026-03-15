@@ -11,6 +11,7 @@ struct RootContentView: View {
     @ObservedObject var noteStore: NoteStore
     @ObservedObject var tabStore: TabStore
     @ObservedObject var appModeStore: AppModeStore
+    @ObservedObject var journalStore: JournalStore
 
     var body: some View {
         VStack(spacing: 0) {
