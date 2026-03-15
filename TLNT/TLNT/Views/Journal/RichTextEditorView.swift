@@ -8,8 +8,93 @@
 import SwiftUI
 import AppKit
 
-struct RichTextEditorView: NSViewRepresentable {
+// MARK: - Rich Text Editor with Formatting Toolbar
+
+struct RichTextEditorView: View {
     @Binding var text: String
+    @State private var showToolbar = false
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            RichTextNSView(text: $text, showToolbar: $showToolbar)
+
+            // Floating formatting toolbar
+            if showToolbar {
+                formattingToolbar
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+    }
+
+    private var formattingToolbar: some View {
+        HStack(spacing: 12) {
+            FormatButton(label: "B", font: .bold) {
+                wrapSelection(prefix: "**", suffix: "**")
+            }
+            FormatButton(label: "I", font: .regular) {
+                wrapSelection(prefix: "_", suffix: "_")
+            }
+            FormatButton(label: "H", font: .regular) {
+                prependToLine(prefix: "## ")
+            }
+            FormatButton(label: "List", font: .regular, systemImage: "list.bullet") {
+                prependToLine(prefix: "- ")
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(red: 0.96, green: 0.93, blue: 0.87))
+                .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+        )
+        .padding(.top, 4)
+    }
+
+    private func wrapSelection(prefix: String, suffix: String) {
+        // For now, append formatting markers — the NSTextView handles display
+        // This is a simplified approach; full rich text would need NSTextView coordination
+        text += prefix + suffix
+    }
+
+    private func prependToLine(prefix: String) {
+        if text.isEmpty || text.hasSuffix("\n") {
+            text += prefix
+        } else {
+            text += "\n" + prefix
+        }
+    }
+}
+
+struct FormatButton: View {
+    let label: String
+    let font: Font.Weight
+    var systemImage: String? = nil
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            if let systemImage = systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 12, weight: .medium))
+            } else {
+                Text(label)
+                    .font(.system(size: 13, weight: font, design: .serif))
+            }
+        }
+        .buttonStyle(.plain)
+        .foregroundColor(Color(red: 0.35, green: 0.25, blue: 0.15))
+        .frame(width: 28, height: 24)
+        .background(Color(red: 0.92, green: 0.88, blue: 0.80).opacity(0.5))
+        .cornerRadius(4)
+    }
+}
+
+// MARK: - NSViewRepresentable for NSTextView
+
+struct RichTextNSView: NSViewRepresentable {
+    @Binding var text: String
+    @Binding var showToolbar: Bool
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -38,7 +123,6 @@ struct RichTextEditorView: NSViewRepresentable {
         scrollView.backgroundColor = .clear
         scrollView.drawsBackground = false
 
-        // Load markdown content as attributed string
         loadContent(into: textView)
 
         return scrollView
@@ -53,36 +137,37 @@ struct RichTextEditorView: NSViewRepresentable {
     }
 
     private func loadContent(into textView: NSTextView) {
+        let inkColor = NSColor(red: 0.20, green: 0.15, blue: 0.10, alpha: 1.0)
+        let serifFont = NSFont(name: "Georgia", size: 15) ?? NSFont.systemFont(ofSize: 15)
+
         if text.isEmpty {
             textView.string = ""
-            textView.font = NSFont(name: "Georgia", size: 15) ?? NSFont.systemFont(ofSize: 15)
-            textView.textColor = NSColor(red: 0.20, green: 0.15, blue: 0.10, alpha: 1.0)
+            textView.font = serifFont
+            textView.textColor = inkColor
             return
         }
 
-        // Try to parse markdown
         if let attrStr = try? NSAttributedString(
             markdown: text,
             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
         ) {
             let mutable = NSMutableAttributedString(attributedString: attrStr)
-            // Apply our serif font and color throughout
             let range = NSRange(location: 0, length: mutable.length)
-            mutable.addAttribute(.font, value: NSFont(name: "Georgia", size: 15) ?? NSFont.systemFont(ofSize: 15), range: range)
-            mutable.addAttribute(.foregroundColor, value: NSColor(red: 0.20, green: 0.15, blue: 0.10, alpha: 1.0), range: range)
+            mutable.addAttribute(.font, value: serifFont, range: range)
+            mutable.addAttribute(.foregroundColor, value: inkColor, range: range)
             textView.textStorage?.setAttributedString(mutable)
         } else {
             textView.string = text
-            textView.font = NSFont(name: "Georgia", size: 15) ?? NSFont.systemFont(ofSize: 15)
-            textView.textColor = NSColor(red: 0.20, green: 0.15, blue: 0.10, alpha: 1.0)
+            textView.font = serifFont
+            textView.textColor = inkColor
         }
     }
 
     class Coordinator: NSObject, NSTextViewDelegate {
-        var parent: RichTextEditorView
+        var parent: RichTextNSView
         var isUserEditing = false
 
-        init(_ parent: RichTextEditorView) {
+        init(_ parent: RichTextNSView) {
             self.parent = parent
         }
 
@@ -91,6 +176,22 @@ struct RichTextEditorView: NSViewRepresentable {
             isUserEditing = true
             parent.text = textView.string
             isUserEditing = false
+        }
+
+        func textDidBeginEditing(_ notification: Notification) {
+            DispatchQueue.main.async {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    self.parent.showToolbar = true
+                }
+            }
+        }
+
+        func textDidEndEditing(_ notification: Notification) {
+            DispatchQueue.main.async {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    self.parent.showToolbar = false
+                }
+            }
         }
     }
 }
