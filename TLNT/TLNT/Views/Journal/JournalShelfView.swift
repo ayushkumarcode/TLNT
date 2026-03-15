@@ -14,6 +14,8 @@ struct JournalShelfView: View {
     @State private var isCreatingJournal = false
     @State private var newJournalTitle = ""
     @State private var newJournalCover: CoverStyle = .black
+    @State private var hoveredJournalId: UUID?
+    @State private var tappedJournalId: UUID?
 
     private let bookSize = CGSize(width: 120, height: 165)
     private let booksPerShelf = 4
@@ -22,21 +24,21 @@ struct JournalShelfView: View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(spacing: 0) {
-                    Spacer()
-                        .frame(height: 20)
+                    Spacer().frame(height: 30)
 
                     let shelves = shelfRows()
                     ForEach(Array(shelves.enumerated()), id: \.offset) { index, shelfJournals in
                         shelfRow(journals: shelfJournals, shelfIndex: index, totalWidth: geometry.size.width)
                     }
 
-                    // Extra empty shelf if last shelf is full
                     if shelves.isEmpty || (shelves.last?.count ?? 0) >= booksPerShelf {
                         emptyShelfRow(totalWidth: geometry.size.width)
                     }
+
+                    Spacer().frame(height: 50)
                 }
             }
-            .background(shelfBackground)
+            .background(shelfBackground(size: geometry.size))
         }
     }
 
@@ -54,8 +56,7 @@ struct JournalShelfView: View {
             }
         }
 
-        // Add the "new journal" slot
-        currentRow.append(nil) // nil = "add new" placeholder
+        currentRow.append(nil) // "add new" slot
         rows.append(currentRow)
 
         return rows
@@ -63,8 +64,7 @@ struct JournalShelfView: View {
 
     private func shelfRow(journals: [Journal?], shelfIndex: Int, totalWidth: CGFloat) -> some View {
         VStack(spacing: 0) {
-            // Books sitting on this shelf
-            HStack(alignment: .bottom, spacing: 20) {
+            HStack(alignment: .bottom, spacing: 24) {
                 ForEach(Array(journals.enumerated()), id: \.offset) { index, journal in
                     if let journal = journal {
                         bookOnShelf(journal: journal)
@@ -74,29 +74,52 @@ struct JournalShelfView: View {
                 }
                 Spacer()
             }
-            .padding(.horizontal, 30)
+            .padding(.horizontal, 36)
             .padding(.bottom, 0)
 
-            // Shelf plank
             shelfPlank(width: totalWidth)
         }
     }
 
     private func emptyShelfRow(totalWidth: CGFloat) -> some View {
         VStack(spacing: 0) {
-            Spacer()
-                .frame(height: bookSize.height + 20)
+            Spacer().frame(height: bookSize.height + 30)
             shelfPlank(width: totalWidth)
         }
     }
 
-    // MARK: - Book on Shelf
+    // MARK: - Book on Shelf (with hover + tap animation)
 
     private func bookOnShelf(journal: Journal) -> some View {
-        BookCoverView(journal: journal, size: bookSize)
-            .rotation3DEffect(.degrees(-8), axis: (x: 0.1, y: 1, z: 0), perspective: 0.5)
+        let isHovered = hoveredJournalId == journal.id
+        let isTapped = tappedJournalId == journal.id
+
+        return BookCoverView(journal: journal, size: bookSize)
+            .rotation3DEffect(
+                .degrees(isHovered ? -15 : -8),
+                axis: (x: isHovered ? 0.3 : 0.1, y: 1, z: 0),
+                perspective: 0.5
+            )
+            .scaleEffect(isTapped ? 1.08 : (isHovered ? 1.03 : 1.0))
+            .offset(y: isTapped ? -12 : (isHovered ? -4 : 0))
+            .shadow(
+                color: .black.opacity(isTapped ? 0.5 : (isHovered ? 0.4 : 0.3)),
+                radius: isTapped ? 15 : (isHovered ? 10 : 6),
+                x: isTapped ? 0 : 3,
+                y: isTapped ? 10 : (isHovered ? 6 : 3)
+            )
+            .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isHovered)
+            .animation(.spring(response: 0.25, dampingFraction: 0.6), value: isTapped)
+            .onHover { hovering in
+                hoveredJournalId = hovering ? journal.id : nil
+            }
             .onTapGesture {
-                onOpenJournal(journal)
+                // Tap animation: pull forward, then open
+                tappedJournalId = journal.id
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    tappedJournalId = nil
+                    onOpenJournal(journal)
+                }
             }
             .contextMenu {
                 Button(role: .destructive) {
@@ -124,7 +147,6 @@ struct JournalShelfView: View {
                     Image(systemName: "plus.circle")
                         .font(.system(size: 30, weight: .light))
                         .foregroundColor(Color(red: 0.75, green: 0.65, blue: 0.48))
-
                     Text("New Journal")
                         .font(.system(size: 11, weight: .medium, design: .serif))
                         .foregroundColor(Color(red: 0.75, green: 0.65, blue: 0.48))
@@ -139,89 +161,125 @@ struct JournalShelfView: View {
         }
     }
 
-    // MARK: - Shelf Plank
+    // MARK: - Shelf Plank (enhanced 3D)
 
     private func shelfPlank(width: CGFloat) -> some View {
         ZStack(alignment: .top) {
-            // Plank top surface
+            // Plank top surface with better wood color
             Rectangle()
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color(red: 0.38, green: 0.26, blue: 0.18),
-                            Color(red: 0.45, green: 0.32, blue: 0.22),
-                            Color(red: 0.38, green: 0.26, blue: 0.18),
+                            Color(red: 0.42, green: 0.30, blue: 0.20),
+                            Color(red: 0.50, green: 0.36, blue: 0.24),
+                            Color(red: 0.46, green: 0.33, blue: 0.22),
+                            Color(red: 0.42, green: 0.30, blue: 0.20),
                         ],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
                 )
-                .frame(height: 14)
+                .frame(height: 16)
+                .shadow(color: .black.opacity(0.1), radius: 2, y: -1)
 
-            // Wood grain lines
+            // Wood grain
             Canvas { context, canvasSize in
-                for i in stride(from: CGFloat(0), to: canvasSize.width, by: 40) {
-                    let noise = sin(i * 0.1) * 3
+                for i in stride(from: CGFloat(0), to: canvasSize.width, by: 30) {
+                    let noise = sin(i * 0.08) * 4
+                    let noise2 = cos(i * 0.15) * 2
                     var path = Path()
-                    path.move(to: CGPoint(x: i, y: 2 + noise))
-                    path.addLine(to: CGPoint(x: i + 35, y: 4 + noise))
-                    context.stroke(path, with: .color(Color.white.opacity(0.06)), lineWidth: 0.5)
+                    path.move(to: CGPoint(x: i, y: 3 + noise))
+                    path.addQuadCurve(
+                        to: CGPoint(x: i + 28, y: 5 + noise2),
+                        control: CGPoint(x: i + 14, y: 2 + noise * 0.5)
+                    )
+                    context.stroke(path, with: .color(Color.white.opacity(0.07)), lineWidth: 0.5)
+
+                    // Second grain line slightly offset
+                    var path2 = Path()
+                    path2.move(to: CGPoint(x: i + 5, y: 9 + noise * 0.3))
+                    path2.addLine(to: CGPoint(x: i + 25, y: 11 + noise2 * 0.5))
+                    context.stroke(path2, with: .color(Color.black.opacity(0.04)), lineWidth: 0.3)
                 }
             }
-            .frame(height: 14)
+            .frame(height: 16)
             .allowsHitTesting(false)
 
-            // Front face of the shelf (3D edge)
+            // Front face with highlight and shadow
             VStack(spacing: 0) {
-                // Highlight at top edge
                 Rectangle()
-                    .fill(Color.white.opacity(0.1))
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.15), Color.white.opacity(0.05)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
                     .frame(height: 1)
 
                 Rectangle()
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color(red: 0.32, green: 0.22, blue: 0.14),
-                                Color(red: 0.26, green: 0.17, blue: 0.10),
+                                Color(red: 0.36, green: 0.25, blue: 0.16),
+                                Color(red: 0.30, green: 0.20, blue: 0.12),
                             ],
                             startPoint: .top,
                             endPoint: .bottom
                         )
                     )
-                    .frame(height: 10)
+                    .frame(height: 12)
 
-                // Shadow below
+                // Bottom shadow
                 Rectangle()
-                    .fill(Color.black.opacity(0.15))
-                    .frame(height: 2)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.black.opacity(0.2), Color.black.opacity(0.05)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(height: 4)
             }
-            .offset(y: 14)
+            .offset(y: 16)
         }
-        .frame(height: 26)
+        .frame(height: 33)
     }
 
     // MARK: - Background
 
-    private var shelfBackground: some View {
-        LinearGradient(
-            colors: [
-                Color(red: 0.22, green: 0.16, blue: 0.12),
-                Color(red: 0.18, green: 0.13, blue: 0.09),
-                Color(red: 0.15, green: 0.10, blue: 0.07),
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .overlay(
-            // Subtle warm vignette
-            RadialGradient(
-                colors: [Color(red: 0.25, green: 0.18, blue: 0.12).opacity(0.3), Color.black.opacity(0.15)],
-                center: .center,
-                startRadius: 150,
-                endRadius: 500
+    private func shelfBackground(size: CGSize) -> some View {
+        ZStack {
+            // Wall behind the shelf — warm dark wood paneling
+            LinearGradient(
+                colors: [
+                    Color(red: 0.22, green: 0.16, blue: 0.12),
+                    Color(red: 0.18, green: 0.13, blue: 0.09),
+                    Color(red: 0.14, green: 0.10, blue: 0.06),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
             )
-        )
+
+            // Warm ambient light from above
+            RadialGradient(
+                colors: [
+                    Color(red: 0.35, green: 0.25, blue: 0.18).opacity(0.25),
+                    Color.clear
+                ],
+                center: .init(x: 0.5, y: 0.1),
+                startRadius: 0,
+                endRadius: size.height * 0.7
+            )
+
+            // Subtle vignette
+            RadialGradient(
+                colors: [Color.clear, Color.black.opacity(0.2)],
+                center: .center,
+                startRadius: size.width * 0.3,
+                endRadius: size.width * 0.8
+            )
+        }
     }
 
     // MARK: - New Journal Popover
@@ -235,7 +293,6 @@ struct JournalShelfView: View {
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 200)
 
-            // Cover style picker
             HStack(spacing: 8) {
                 ForEach(CoverStyle.allCases, id: \.self) { style in
                     coverStyleButton(style)
@@ -290,8 +347,6 @@ struct JournalShelfView: View {
         newJournalTitle = ""
         newJournalCover = .black
         isCreatingJournal = false
-
-        // Auto-open the new journal
         onOpenJournal(journal)
     }
 }
