@@ -16,6 +16,9 @@ struct JournalBookView: View {
     @State private var currentPageIndex: Int = 0
     @State private var coverRotation: Double = 0 // 0 = closed, -180 = fully open
     @State private var isBookOpen = false
+    @State private var pageFlipAngle: Double = 0
+    @State private var isFlippingForward = false
+    @State private var isFlippingBackward = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -148,10 +151,8 @@ struct JournalBookView: View {
         .frame(width: width)
         .clipShape(Rectangle())
         .onTapGesture {
-            if currentPageIndex > 0 {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    currentPageIndex -= 1
-                }
+            if currentPageIndex > 0 && !isFlippingForward && !isFlippingBackward {
+                flipBackward()
             }
         }
     }
@@ -228,6 +229,19 @@ struct JournalBookView: View {
         }
         .frame(width: width)
         .clipShape(Rectangle())
+        .rotation3DEffect(
+            .degrees(pageFlipAngle),
+            axis: (x: 0, y: 1, z: 0),
+            anchor: .leading,
+            perspective: 0.4
+        )
+        // Moving shadow during page flip
+        .shadow(
+            color: .black.opacity(abs(pageFlipAngle) > 0 ? 0.2 * sin(abs(pageFlipAngle) / 180 * .pi) : 0),
+            radius: 10,
+            x: pageFlipAngle < 0 ? -5 : 5,
+            y: 0
+        )
     }
 
     // MARK: - Helpers
@@ -286,16 +300,47 @@ struct JournalBookView: View {
     }
 
     private func flipForward() {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+        guard !isFlippingForward && !isFlippingBackward else { return }
+        guard currentPageIndex < pages.count - 1 else { return }
+
+        isFlippingForward = true
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
+            pageFlipAngle = -180
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
             currentPageIndex = min(currentPageIndex + 1, pages.count - 1)
+            pageFlipAngle = 0
+            isFlippingForward = false
+        }
+    }
+
+    private func flipBackward() {
+        guard !isFlippingForward && !isFlippingBackward else { return }
+        guard currentPageIndex > 0 else { return }
+
+        isFlippingBackward = true
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
+            pageFlipAngle = 180
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            currentPageIndex = max(currentPageIndex - 1, 0)
+            pageFlipAngle = 0
+            isFlippingBackward = false
         }
     }
 
     private func addAndFlipForward() {
         let newPage = journalStore.addPage(to: journal.id)
         pages = journalStore.loadPages(for: journal.id)
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+
+        isFlippingForward = true
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
+            pageFlipAngle = -180
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
             currentPageIndex = pages.count - 1
+            pageFlipAngle = 0
+            isFlippingForward = false
         }
     }
 
