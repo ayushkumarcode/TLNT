@@ -98,6 +98,7 @@ struct RichTextNSView: NSViewRepresentable {
         layoutManager.addTextContainer(textContainer)
 
         let textView = FormattableTextView(frame: .zero, textContainer: textContainer)
+        textView.baseFont = Self.serifFont
         textView.delegate = context.coordinator
         textView.font = Self.serifFont
         textView.textColor = Self.inkColor

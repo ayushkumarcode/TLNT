@@ -638,6 +638,7 @@ struct ComposeBubbleView: NSViewRepresentable {
         layoutManager.addTextContainer(textContainer)
 
         let textView = FormattableTextView(frame: .zero, textContainer: textContainer)
+        textView.baseFont = Self.baseFont
         textView.delegate = context.coordinator
         textView.font = Self.baseFont
         textView.textColor = Self.textColor

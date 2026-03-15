@@ -7,19 +7,43 @@
 
 import AppKit
 
-/// Custom NSTextView subclass that adds ⌘⇧X for strikethrough.
-/// ⌘B (bold) and ⌘I (italic) are built-in when isRichText=true.
+/// Custom NSTextView subclass that handles ⌘B (bold), ⌘I (italic),
+/// ⌘⇧X (strikethrough) explicitly — NSFontManager's responder chain
+/// doesn't work reliably in SwiftUI-hosted views.
 class FormattableTextView: NSTextView {
 
+    /// The base font used for this text view (set by the creator).
+    var baseFont: NSFont = NSFont.systemFont(ofSize: 13)
+
     override func keyDown(with event: NSEvent) {
-        // ⌘⇧X → toggle strikethrough
-        if event.modifierFlags.contains([.command, .shift]),
-           event.charactersIgnoringModifiers?.lowercased() == "x" {
-            MarkdownConverter.toggleStrikethrough(in: self)
-            // Notify delegate of change
-            NotificationCenter.default.post(name: NSText.didChangeNotification, object: self)
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let key = event.charactersIgnoringModifiers?.lowercased() ?? ""
+
+        // ⌘B → toggle bold
+        if flags == .command && key == "b" {
+            MarkdownConverter.toggleBold(in: self, baseFont: baseFont)
+            notifyChange()
             return
         }
+
+        // ⌘I → toggle italic
+        if flags == .command && key == "i" {
+            MarkdownConverter.toggleItalic(in: self, baseFont: baseFont)
+            notifyChange()
+            return
+        }
+
+        // ⌘⇧X → toggle strikethrough
+        if flags == [.command, .shift] && key == "x" {
+            MarkdownConverter.toggleStrikethrough(in: self)
+            notifyChange()
+            return
+        }
+
         super.keyDown(with: event)
+    }
+
+    private func notifyChange() {
+        delegate?.textDidChange?(Notification(name: NSText.didChangeNotification, object: self))
     }
 }
