@@ -21,6 +21,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var noteStore: NoteStore!
     private var tabStore: TabStore!
     private var hashStore: HashStore!
+    private var appModeStore: AppModeStore!
     private var screenshotWatcher: ScreenshotWatcher!
     private var textCaptureService: TextCaptureService!
     private var hotkeyManager: HotkeyManager!
@@ -44,6 +45,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         TLNTLogger.debug("Initializing HashStore...", category: TLNTLogger.storage)
         hashStore = HashStore()
         TLNTLogger.success("HashStore initialized", category: TLNTLogger.storage)
+
+        TLNTLogger.debug("Initializing AppModeStore...", category: TLNTLogger.storage)
+        appModeStore = AppModeStore()
+        TLNTLogger.success("AppModeStore initialized", category: TLNTLogger.storage)
 
         TLNTLogger.debug("Initializing SpotlightIndexer...", category: TLNTLogger.spotlight)
         spotlightIndexer = SpotlightIndexer()
@@ -169,7 +174,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         if mainWindowController == nil {
             TLNTLogger.debug("Creating new MainWindowController...", category: TLNTLogger.ui)
-            mainWindowController = MainWindowController(noteStore: noteStore, tabStore: tabStore)
+            mainWindowController = MainWindowController(noteStore: noteStore, tabStore: tabStore, appModeStore: appModeStore)
             TLNTLogger.debug("MainWindowController created", category: TLNTLogger.ui)
         }
 

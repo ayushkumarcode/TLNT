@@ -110,7 +110,6 @@ struct MainContentView: View {
                 batchActionBar
             }
         }
-        .frame(minWidth: 500, minHeight: 400)
     }
 
     // MARK: - Batch Action Bar
