@@ -11,24 +11,23 @@ struct BookCoverView: View {
     let journal: Journal
     let size: CGSize
 
-    private var coverColors: (base: Color, highlight: Color) {
+    private var coverColors: (base: Color, highlight: Color, sheen: Color) {
         switch journal.coverStyle {
         case .black:
-            return (Color(red: 0.10, green: 0.10, blue: 0.10), Color(red: 0.18, green: 0.18, blue: 0.18))
+            return (Color(red: 0.08, green: 0.08, blue: 0.08), Color(red: 0.16, green: 0.16, blue: 0.16), Color(red: 0.30, green: 0.30, blue: 0.30))
         case .brown:
-            return (Color(red: 0.30, green: 0.18, blue: 0.10), Color(red: 0.42, green: 0.28, blue: 0.18))
+            return (Color(red: 0.28, green: 0.16, blue: 0.08), Color(red: 0.40, green: 0.26, blue: 0.16), Color(red: 0.52, green: 0.38, blue: 0.26))
         case .burgundy:
-            return (Color(red: 0.35, green: 0.08, blue: 0.12), Color(red: 0.48, green: 0.15, blue: 0.18))
+            return (Color(red: 0.32, green: 0.06, blue: 0.10), Color(red: 0.45, green: 0.13, blue: 0.16), Color(red: 0.55, green: 0.22, blue: 0.24))
         case .navy:
-            return (Color(red: 0.08, green: 0.12, blue: 0.25), Color(red: 0.15, green: 0.20, blue: 0.38))
+            return (Color(red: 0.06, green: 0.10, blue: 0.22), Color(red: 0.13, green: 0.18, blue: 0.35), Color(red: 0.22, green: 0.28, blue: 0.48))
         case .forest:
-            return (Color(red: 0.08, green: 0.20, blue: 0.10), Color(red: 0.15, green: 0.30, blue: 0.18))
+            return (Color(red: 0.06, green: 0.18, blue: 0.08), Color(red: 0.13, green: 0.28, blue: 0.16), Color(red: 0.22, green: 0.38, blue: 0.24))
         }
     }
 
     var body: some View {
         ZStack {
-            // Book body with spine and page edges
             HStack(spacing: 0) {
                 // Spine
                 spineView
@@ -36,25 +35,13 @@ struct BookCoverView: View {
 
                 // Cover face
                 ZStack {
-                    // Leather base
                     leatherBase
-
-                    // Grain texture overlay
-                    grainOverlay
-
-                    // Wear patina
-                    wearPatina
-
-                    // Stitching border
+                    smoothGrainOverlay
+                    glossySheen
+                    wearScuffs
                     stitchingBorder
-
-                    // Gold clasp at top-center
-                    goldClasp
-
-                    // Title emboss
+                    leatherTabClasp
                     titleEmboss
-
-                    // Page edges visible on right side
                     pageEdges
                 }
             }
@@ -66,144 +53,206 @@ struct BookCoverView: View {
     // MARK: - Cover Components
 
     private var leatherBase: some View {
-        RoundedRectangle(cornerRadius: 3)
+        RoundedRectangle(cornerRadius: 4)
             .fill(
                 LinearGradient(
-                    colors: [coverColors.highlight, coverColors.base, coverColors.base.opacity(0.9)],
+                    colors: [coverColors.highlight, coverColors.base, coverColors.base, coverColors.highlight.opacity(0.8)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
             )
             .overlay(
-                // Inner edge shadow for depth
-                RoundedRectangle(cornerRadius: 3)
-                    .stroke(Color.black.opacity(0.4), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 4)
+                    .stroke(Color.black.opacity(0.5), lineWidth: 1)
             )
     }
 
-    private var grainOverlay: some View {
+    // Smooth leather grain (calfskin style — subtle, not pebbled)
+    private var smoothGrainOverlay: some View {
         Canvas { context, canvasSize in
-            // Procedural leather grain — fine pebble texture
-            let step: CGFloat = 2.5
+            let step: CGFloat = 2
             for x in stride(from: 0, to: canvasSize.width, by: step) {
                 for y in stride(from: 0, to: canvasSize.height, by: step) {
                     let noise = sin(x * 12.9898 + y * 78.233) * 43758.5453
                     let frac = noise - floor(noise)
 
-                    // Light grain highlights (pebble peaks)
-                    if frac > 0.55 {
-                        let opacity = (frac - 0.55) * 0.12
-                        let rect = CGRect(x: x, y: y, width: step * 0.7, height: step * 0.7)
+                    // Very subtle grain (smooth leather has less texture)
+                    if frac > 0.7 {
+                        let opacity = (frac - 0.7) * 0.08
+                        let rect = CGRect(x: x, y: y, width: step * 0.5, height: step * 0.5)
                         context.fill(Path(ellipseIn: rect), with: .color(Color.white.opacity(opacity)))
                     }
 
-                    // Dark grain valleys
-                    if frac < 0.2 {
-                        let opacity = (0.2 - frac) * 0.15
-                        let rect = CGRect(x: x, y: y, width: step * 1.0, height: step * 0.5)
+                    if frac < 0.12 {
+                        let opacity = (0.12 - frac) * 0.10
+                        let rect = CGRect(x: x, y: y, width: step * 0.8, height: step * 0.4)
                         context.fill(Path(ellipseIn: rect), with: .color(Color.black.opacity(opacity)))
-                    }
-
-                    // Cross-hatch grain (diagonal lines for leather texture)
-                    let noise2 = sin(x * 7.456 + y * 23.111) * 12345.6789
-                    let frac2 = noise2 - floor(noise2)
-                    if frac2 > 0.85 {
-                        var line = Path()
-                        line.move(to: CGPoint(x: x, y: y))
-                        line.addLine(to: CGPoint(x: x + step * 2, y: y + step))
-                        context.stroke(line, with: .color(Color.black.opacity(0.04)), lineWidth: 0.3)
                     }
                 }
             }
 
-            // Edge darkening (vignette on the cover)
-            let edgeInset: CGFloat = 8
-            let topGrad = CGRect(x: 0, y: 0, width: canvasSize.width, height: edgeInset)
-            context.fill(Path(topGrad), with: .linearGradient(
-                Gradient(colors: [Color.black.opacity(0.12), Color.clear]),
-                startPoint: CGPoint(x: 0, y: 0),
+            // Edge darkening
+            let edgeInset: CGFloat = 10
+            let topRect = CGRect(x: 0, y: 0, width: canvasSize.width, height: edgeInset)
+            context.fill(Path(topRect), with: .linearGradient(
+                Gradient(colors: [Color.black.opacity(0.15), Color.clear]),
+                startPoint: .zero,
                 endPoint: CGPoint(x: 0, y: edgeInset)
             ))
-            let bottomGrad = CGRect(x: 0, y: canvasSize.height - edgeInset, width: canvasSize.width, height: edgeInset)
-            context.fill(Path(bottomGrad), with: .linearGradient(
-                Gradient(colors: [Color.clear, Color.black.opacity(0.12)]),
+            let bottomRect = CGRect(x: 0, y: canvasSize.height - edgeInset, width: canvasSize.width, height: edgeInset)
+            context.fill(Path(bottomRect), with: .linearGradient(
+                Gradient(colors: [Color.clear, Color.black.opacity(0.15)]),
                 startPoint: CGPoint(x: 0, y: canvasSize.height - edgeInset),
                 endPoint: CGPoint(x: 0, y: canvasSize.height)
             ))
         }
-        .clipShape(RoundedRectangle(cornerRadius: 3))
+        .clipShape(RoundedRectangle(cornerRadius: 4))
         .allowsHitTesting(false)
     }
 
-    private var wearPatina: some View {
+    // Glossy sheen — the reflective quality of polished leather
+    private var glossySheen: some View {
         Canvas { context, canvasSize in
-            // Simulate worn areas with lighter spots
-            let wearSpots: [(CGFloat, CGFloat, CGFloat)] = [
-                (0.3, 0.25, 0.3),
-                (0.7, 0.4, 0.25),
-                (0.5, 0.7, 0.35),
-                (0.2, 0.6, 0.2),
-                (0.8, 0.8, 0.15),
+            // Large specular highlight in upper-left area (like light reflecting off leather)
+            let center = CGPoint(x: canvasSize.width * 0.35, y: canvasSize.height * 0.3)
+            let r = canvasSize.width * 0.5
+            let rect = CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)
+            context.fill(
+                Path(ellipseIn: rect),
+                with: .radialGradient(
+                    Gradient(colors: [Color.white.opacity(0.08), Color.clear]),
+                    center: center,
+                    startRadius: 0,
+                    endRadius: r
+                )
+            )
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .allowsHitTesting(false)
+    }
+
+    // Wear scuffs — whitish marks at corners and edges (matching the real journal)
+    private var wearScuffs: some View {
+        Canvas { context, canvasSize in
+            // Bottom-right corner scuff (prominent in the photo)
+            let scuffs: [(x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat, opacity: Double)] = [
+                (0.7, 0.85, 0.4, 0.2, 0.12),   // Bottom-right corner
+                (0.2, 0.9, 0.3, 0.15, 0.10),    // Bottom-left corner
+                (0.8, 0.75, 0.15, 0.1, 0.08),   // Right edge wear
+                (0.5, 0.95, 0.5, 0.1, 0.09),    // Bottom edge
+                (0.15, 0.3, 0.1, 0.2, 0.05),    // Left side light wear
             ]
-            for (xFrac, yFrac, radius) in wearSpots {
-                let center = CGPoint(x: canvasSize.width * xFrac, y: canvasSize.height * yFrac)
-                let r = canvasSize.width * radius
-                let rect = CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)
+
+            for scuff in scuffs {
+                let center = CGPoint(x: canvasSize.width * scuff.x, y: canvasSize.height * scuff.y)
+                let w = canvasSize.width * scuff.w
+                let h = canvasSize.height * scuff.h
+                let rect = CGRect(x: center.x - w/2, y: center.y - h/2, width: w, height: h)
                 context.fill(
                     Path(ellipseIn: rect),
                     with: .radialGradient(
-                        Gradient(colors: [Color.white.opacity(0.06), Color.clear]),
+                        Gradient(colors: [Color.white.opacity(scuff.opacity), Color.clear]),
                         center: center,
                         startRadius: 0,
-                        endRadius: r
+                        endRadius: max(w, h) / 2
                     )
                 )
             }
+
+            // Fine scratch lines
+            let scratches: [(x1: CGFloat, y1: CGFloat, x2: CGFloat, y2: CGFloat)] = [
+                (0.3, 0.6, 0.5, 0.65),
+                (0.6, 0.5, 0.75, 0.52),
+                (0.4, 0.8, 0.55, 0.82),
+            ]
+            for scratch in scratches {
+                var path = Path()
+                path.move(to: CGPoint(x: canvasSize.width * scratch.x1, y: canvasSize.height * scratch.y1))
+                path.addLine(to: CGPoint(x: canvasSize.width * scratch.x2, y: canvasSize.height * scratch.y2))
+                context.stroke(path, with: .color(Color.white.opacity(0.06)), lineWidth: 0.5)
+            }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 3))
+        .clipShape(RoundedRectangle(cornerRadius: 4))
         .allowsHitTesting(false)
     }
 
+    // Stitching around all edges
     private var stitchingBorder: some View {
-        RoundedRectangle(cornerRadius: 3)
-            .inset(by: 6)
+        RoundedRectangle(cornerRadius: 4)
+            .inset(by: 5)
             .stroke(
-                coverColors.highlight.opacity(0.4),
-                style: StrokeStyle(lineWidth: 0.8, dash: [3, 3])
+                coverColors.sheen.opacity(0.3),
+                style: StrokeStyle(lineWidth: 0.8, dash: [2.5, 2.5])
             )
             .allowsHitTesting(false)
     }
 
-    private var goldClasp: some View {
-        VStack {
-            // Leather tab
-            RoundedRectangle(cornerRadius: 2)
-                .fill(coverColors.base)
-                .frame(width: 14, height: 10)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 2)
-                        .stroke(Color.black.opacity(0.3), lineWidth: 0.5)
-                )
-
-            // Gold circle button
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            Color(red: 0.85, green: 0.75, blue: 0.42),
-                            Color(red: 0.77, green: 0.64, blue: 0.30),
-                            Color(red: 0.55, green: 0.46, blue: 0.21)
-                        ],
-                        center: .init(x: 0.4, y: 0.35),
-                        startRadius: 0,
-                        endRadius: 6
+    // Leather tab + gold rose emblem (matching the real journal's clasp)
+    private var leatherTabClasp: some View {
+        VStack(spacing: 0) {
+            // Leather tab extending from top
+            ZStack {
+                // Tab shape
+                UnevenRoundedRectangle(cornerRadii: .init(topLeading: 2, bottomLeading: 4, bottomTrailing: 4, topTrailing: 2))
+                    .fill(coverColors.base)
+                    .frame(width: 20, height: 22)
+                    .overlay(
+                        UnevenRoundedRectangle(cornerRadii: .init(topLeading: 2, bottomLeading: 4, bottomTrailing: 4, topTrailing: 2))
+                            .stroke(Color.black.opacity(0.3), lineWidth: 0.5)
                     )
-                )
-                .frame(width: 8, height: 8)
-                .shadow(color: .black.opacity(0.4), radius: 1, x: 0.5, y: 0.5)
+                    .shadow(color: .black.opacity(0.3), radius: 1, x: 0, y: 1)
+
+                // Gold rose/flower emblem
+                ZStack {
+                    // Outer circle
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color(red: 0.88, green: 0.78, blue: 0.45),
+                                    Color(red: 0.80, green: 0.68, blue: 0.35),
+                                    Color(red: 0.60, green: 0.50, blue: 0.25)
+                                ],
+                                center: .init(x: 0.4, y: 0.35),
+                                startRadius: 0,
+                                endRadius: 7
+                            )
+                        )
+                        .frame(width: 12, height: 12)
+                        .shadow(color: .black.opacity(0.4), radius: 0.5, x: 0.5, y: 0.5)
+
+                    // Inner rose spiral detail
+                    Canvas { context, canvasSize in
+                        let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
+                        let r: CGFloat = 3
+
+                        // Spiral petals
+                        for i in 0..<6 {
+                            let angle = Double(i) * .pi / 3
+                            let petalCenter = CGPoint(
+                                x: center.x + cos(angle) * r * 0.4,
+                                y: center.y + sin(angle) * r * 0.4
+                            )
+                            let petalRect = CGRect(x: petalCenter.x - 1.5, y: petalCenter.y - 1.5, width: 3, height: 3)
+                            context.fill(
+                                Path(ellipseIn: petalRect),
+                                with: .color(Color(red: 0.70, green: 0.58, blue: 0.28).opacity(0.5))
+                            )
+                        }
+
+                        // Center dot
+                        let dotRect = CGRect(x: center.x - 1, y: center.y - 1, width: 2, height: 2)
+                        context.fill(Path(ellipseIn: dotRect), with: .color(Color(red: 0.55, green: 0.45, blue: 0.20)))
+                    }
+                    .frame(width: 12, height: 12)
+                }
+                .offset(y: 4)
+            }
+
+            Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .padding(.top, 10)
+        .padding(.top, 6)
     }
 
     private var titleEmboss: some View {
@@ -212,11 +261,11 @@ struct BookCoverView: View {
 
             Text(journal.title)
                 .font(.system(size: max(8, size.width * 0.08), weight: .medium, design: .serif))
-                .foregroundColor(Color(red: 0.77, green: 0.64, blue: 0.30).opacity(0.7))
+                .foregroundColor(Color(red: 0.77, green: 0.64, blue: 0.30).opacity(0.65))
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 12)
-                .shadow(color: .black.opacity(0.3), radius: 0.5, x: 0, y: 0.5)
+                .shadow(color: .black.opacity(0.4), radius: 0.5, x: 0, y: 0.5)
 
             Spacer()
                 .frame(height: size.height * 0.25)
@@ -226,22 +275,20 @@ struct BookCoverView: View {
     private var pageEdges: some View {
         HStack {
             Spacer()
-
-            // Stack of page edges on the right side
             VStack(spacing: 0) {
-                ForEach(0..<8, id: \.self) { i in
+                ForEach(0..<10, id: \.self) { _ in
                     Rectangle()
-                        .fill(Color(red: 0.98, green: 0.97, blue: 0.91))
-                        .frame(width: 2, height: (size.height - 12) / 8)
+                        .fill(Color(red: 0.97, green: 0.96, blue: 0.90))
+                        .frame(width: 2.5, height: (size.height - 10) / 10)
                         .overlay(
                             Rectangle()
-                                .fill(Color.black.opacity(0.05))
-                                .frame(width: 2, height: 0.5),
+                                .fill(Color.black.opacity(0.04))
+                                .frame(width: 2.5, height: 0.5),
                             alignment: .bottom
                         )
                 }
             }
-            .padding(.vertical, 6)
+            .padding(.vertical, 5)
         }
     }
 
@@ -252,7 +299,7 @@ struct BookCoverView: View {
             Rectangle()
                 .fill(
                     LinearGradient(
-                        colors: [coverColors.base.opacity(0.7), coverColors.base, coverColors.base.opacity(0.7)],
+                        colors: [coverColors.base.opacity(0.6), coverColors.base, coverColors.base.opacity(0.6)],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
@@ -262,17 +309,17 @@ struct BookCoverView: View {
             VStack(spacing: 0) {
                 ForEach(0..<5, id: \.self) { _ in
                     Rectangle()
-                        .fill(Color.white.opacity(0.05))
+                        .fill(Color.white.opacity(0.04))
                         .frame(height: 1)
                     Spacer()
                 }
             }
-            .padding(.vertical, 10)
+            .padding(.vertical, 8)
 
-            // Spine title (rotated)
+            // Spine title
             Text(journal.title)
                 .font(.system(size: 6, weight: .medium, design: .serif))
-                .foregroundColor(Color(red: 0.77, green: 0.64, blue: 0.30).opacity(0.5))
+                .foregroundColor(Color(red: 0.77, green: 0.64, blue: 0.30).opacity(0.4))
                 .rotationEffect(.degrees(-90))
                 .lineLimit(1)
         }
