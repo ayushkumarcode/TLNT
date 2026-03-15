@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 struct MainContentView: View {
     @ObservedObject var noteStore: NoteStore
     @ObservedObject var tabStore: TabStore
+    var zoomLevel: CGFloat = 1.0
     @State private var searchText = ""
     @State private var isComposing = false
     @State private var composeText = ""
@@ -444,14 +445,15 @@ struct MainContentView: View {
                         }
 
                     LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 300, maximum: 500), spacing: 16)],
-                        spacing: 16
+                        columns: [GridItem(.adaptive(minimum: 300 * zoomLevel, maximum: 500 * zoomLevel), spacing: 16 * zoomLevel)],
+                        spacing: 16 * zoomLevel
                     ) {
                         ForEach(filteredNotes) { note in
                             SelectableNoteItemView(
                                 note: note,
                                 isSelected: selectedNoteIds.contains(note.id),
                                 selectedCount: selectedNoteIds.count,
+                                zoomLevel: zoomLevel,
                                 onSelect: { toggleSelection(note) },
                                 onDelete: {
                                     withAnimation {
@@ -774,6 +776,7 @@ struct SelectableNoteItemView: View {
     let note: Note
     let isSelected: Bool
     let selectedCount: Int
+    var zoomLevel: CGFloat = 1.0
     let onSelect: () -> Void
     let onDelete: () -> Void
     let onDeleteSelected: () -> Void
@@ -790,11 +793,11 @@ struct SelectableNoteItemView: View {
                     editableTextView
                 } else {
                     MarkdownTextView(content: note.content)
-                        .font(.system(size: 13))
+                        .font(.system(size: 13 * zoomLevel))
                         .foregroundColor(.primary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .lineLimit(isExpanded ? nil : 4)
-                        .padding(12)
+                        .padding(12 * zoomLevel)
                 }
             case .screenshot:
                 ImageNoteView(path: note.content)

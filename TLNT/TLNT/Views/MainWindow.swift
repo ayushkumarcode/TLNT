@@ -14,13 +14,15 @@ class MainWindowController {
     private let tabStore: TabStore
     private let appModeStore: AppModeStore
     private let journalStore: JournalStore
+    private let zoomStore: ZoomStore
     private var scrollToId: UUID?
 
-    init(noteStore: NoteStore, tabStore: TabStore, appModeStore: AppModeStore, journalStore: JournalStore) {
+    init(noteStore: NoteStore, tabStore: TabStore, appModeStore: AppModeStore, journalStore: JournalStore, zoomStore: ZoomStore) {
         self.noteStore = noteStore
         self.tabStore = tabStore
         self.appModeStore = appModeStore
         self.journalStore = journalStore
+        self.zoomStore = zoomStore
     }
 
     func show() {
@@ -34,11 +36,10 @@ class MainWindowController {
     func scrollToNote(id: UUID) {
         scrollToId = id
         show()
-        // The scroll will be handled by the SwiftUI view
     }
 
     private func createWindow() {
-        let contentView = RootContentView(noteStore: noteStore, tabStore: tabStore, appModeStore: appModeStore, journalStore: journalStore)
+        let contentView = RootContentView(noteStore: noteStore, tabStore: tabStore, appModeStore: appModeStore, journalStore: journalStore, zoomStore: zoomStore)
 
         window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 900, height: 700),

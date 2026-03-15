@@ -9,6 +9,7 @@ import SwiftUI
 
 struct JournalShelfView: View {
     @ObservedObject var journalStore: JournalStore
+    var zoomLevel: CGFloat = 1.0
     let onOpenJournal: (Journal) -> Void
 
     @State private var isCreatingJournal = false
@@ -17,8 +18,12 @@ struct JournalShelfView: View {
     @State private var hoveredJournalId: UUID?
     @State private var tappedJournalId: UUID?
 
-    private let bookSize = CGSize(width: 120, height: 165)
-    private let booksPerShelf = 4
+    private var bookSize: CGSize {
+        CGSize(width: 120 * zoomLevel, height: 165 * zoomLevel)
+    }
+    private var booksPerShelf: Int {
+        max(2, Int(4.0 / zoomLevel))
+    }
 
     var body: some View {
         GeometryReader { geometry in
