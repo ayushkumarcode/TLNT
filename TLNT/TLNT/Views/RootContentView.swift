@@ -13,17 +13,21 @@ struct RootContentView: View {
     @ObservedObject var appModeStore: AppModeStore
     @ObservedObject var journalStore: JournalStore
 
+    @State private var openedJournal: Journal?
+
     var body: some View {
         VStack(spacing: 0) {
-            // Mode toggle integrated into the top bar
-            HStack(spacing: 0) {
-                modeToggle
-                    .padding(.leading, 12)
-                    .padding(.vertical, 6)
+            // Mode toggle integrated into the top bar (hidden when journal is open)
+            if openedJournal == nil {
+                HStack(spacing: 0) {
+                    modeToggle
+                        .padding(.leading, 12)
+                        .padding(.vertical, 6)
 
-                Spacer()
+                    Spacer()
+                }
+                .background(Color(NSColor.windowBackgroundColor))
             }
-            .background(Color(NSColor.windowBackgroundColor))
 
             // Content based on active mode
             Group {
@@ -32,8 +36,25 @@ struct RootContentView: View {
                     MainContentView(noteStore: noteStore, tabStore: tabStore)
                         .transition(.opacity.combined(with: .move(edge: .leading)))
                 case .journal:
-                    journalPlaceholder
+                    if let journal = openedJournal {
+                        JournalBookView(
+                            journal: journal,
+                            journalStore: journalStore,
+                            onClose: {
+                                withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) {
+                                    openedJournal = nil
+                                }
+                            }
+                        )
+                        .transition(.scale(scale: 0.8).combined(with: .opacity))
+                    } else {
+                        JournalShelfView(journalStore: journalStore) { journal in
+                            withAnimation(.spring(response: 0.5, dampingFraction: 0.78)) {
+                                openedJournal = journal
+                            }
+                        }
                         .transition(.opacity.combined(with: .move(edge: .trailing)))
+                    }
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: appModeStore.activeMode)
@@ -76,22 +97,4 @@ struct RootContentView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Journal Placeholder
-
-    private var journalPlaceholder: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "book.closed")
-                .font(.system(size: 48))
-                .foregroundColor(.secondary)
-
-            Text("Journal Mode")
-                .font(.title2)
-                .foregroundColor(.secondary)
-
-            Text("Coming soon...")
-                .font(.subheadline)
-                .foregroundColor(.secondary.opacity(0.7))
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
 }
