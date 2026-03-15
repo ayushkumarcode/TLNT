@@ -34,7 +34,7 @@ struct NoteItemView: View {
                 VideoNoteView(path: note.content)
             }
         }
-        .frame(width: 200)
+        .frame(maxWidth: .infinity)
         .background(Color(NSColor.controlBackgroundColor))
         .cornerRadius(8)
         .shadow(color: .black.opacity(0.08), radius: 2, y: 1)

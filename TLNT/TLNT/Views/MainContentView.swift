@@ -444,7 +444,7 @@ struct MainContentView: View {
                         }
 
                     LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 200, maximum: 350), spacing: 16)],
+                        columns: [GridItem(.adaptive(minimum: 300, maximum: 500), spacing: 16)],
                         spacing: 16
                     ) {
                         ForEach(filteredNotes) { note in
@@ -780,6 +780,7 @@ struct SelectableNoteItemView: View {
     let onUpdate: (String) -> Void
     @State private var isEditing = false
     @State private var editText = ""
+    @State private var isExpanded = false
 
     var body: some View {
         Group {
@@ -788,11 +789,11 @@ struct SelectableNoteItemView: View {
                 if isEditing {
                     editableTextView
                 } else {
-                    // Use a simple Text view that doesn't consume gestures
                     Text(note.content)
                         .font(.system(size: 13))
                         .foregroundColor(.primary)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .lineLimit(isExpanded ? nil : 4)
                         .padding(12)
                 }
             case .screenshot:
@@ -801,10 +802,10 @@ struct SelectableNoteItemView: View {
                 VideoNoteView(path: note.content)
             }
         }
-        .frame(width: 200)
+        .frame(maxWidth: .infinity)
         .background(Color(NSColor.controlBackgroundColor))
         .cornerRadius(8)
-        .shadow(color: .black.opacity(0.08), radius: 2, y: 1)
+        .shadow(color: .black.opacity(isExpanded ? 0.15 : 0.08), radius: isExpanded ? 4 : 2, y: isExpanded ? 2 : 1)
         .overlay(
             Group {
                 if isSelected {
@@ -822,12 +823,22 @@ struct SelectableNoteItemView: View {
             if note.type == .text && !isEditing {
                 editText = note.content
                 isEditing = true
+                isExpanded = true
             }
         }
         .onTapGesture(count: 1) {
-            // Single-click to select (only when not editing)
             if !isEditing {
-                onSelect()
+                if selectedCount > 0 || NSEvent.modifierFlags.contains(.command) {
+                    // In selection mode, toggle selection
+                    onSelect()
+                } else if note.type == .text {
+                    // Single click expands/collapses text notes
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        isExpanded.toggle()
+                    }
+                } else {
+                    onSelect()
+                }
             }
         }
         .contextMenu {
@@ -896,6 +907,9 @@ struct SelectableNoteItemView: View {
         guard !text.isEmpty else { return }
         onUpdate(text)
         isEditing = false
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            isExpanded = false
+        }
         editText = ""
     }
 
