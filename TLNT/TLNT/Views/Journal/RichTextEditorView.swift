@@ -18,7 +18,6 @@ struct RichTextEditorView: View {
         ZStack(alignment: .top) {
             RichTextNSView(text: $text, showToolbar: $showToolbar)
 
-            // Floating formatting toolbar
             if showToolbar {
                 formattingToolbar
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -28,17 +27,14 @@ struct RichTextEditorView: View {
 
     private var formattingToolbar: some View {
         HStack(spacing: 12) {
-            FormatButton(label: "B", font: .bold) {
-                wrapSelection(prefix: "**", suffix: "**")
+            FormatButton(label: "B", font: .bold, shortcut: "⌘B") {
+                NotificationCenter.default.post(name: .richTextToggleBold, object: nil)
             }
-            FormatButton(label: "I", font: .regular) {
-                wrapSelection(prefix: "_", suffix: "_")
+            FormatButton(label: "I", font: .regular, shortcut: "⌘I") {
+                NotificationCenter.default.post(name: .richTextToggleItalic, object: nil)
             }
-            FormatButton(label: "H", font: .regular) {
-                prependToLine(prefix: "## ")
-            }
-            FormatButton(label: "List", font: .regular, systemImage: "list.bullet") {
-                prependToLine(prefix: "- ")
+            FormatButton(label: "S", font: .regular, shortcut: "⌘⇧X", strikethrough: true) {
+                NotificationCenter.default.post(name: .richTextToggleStrikethrough, object: nil)
             }
         }
         .padding(.horizontal, 12)
@@ -50,43 +46,33 @@ struct RichTextEditorView: View {
         )
         .padding(.top, 4)
     }
+}
 
-    private func wrapSelection(prefix: String, suffix: String) {
-        // For now, append formatting markers — the NSTextView handles display
-        // This is a simplified approach; full rich text would need NSTextView coordination
-        text += prefix + suffix
-    }
-
-    private func prependToLine(prefix: String) {
-        if text.isEmpty || text.hasSuffix("\n") {
-            text += prefix
-        } else {
-            text += "\n" + prefix
-        }
-    }
+extension Notification.Name {
+    static let richTextToggleBold = Notification.Name("richTextToggleBold")
+    static let richTextToggleItalic = Notification.Name("richTextToggleItalic")
+    static let richTextToggleStrikethrough = Notification.Name("richTextToggleStrikethrough")
 }
 
 struct FormatButton: View {
     let label: String
     let font: Font.Weight
-    var systemImage: String? = nil
+    var shortcut: String? = nil
+    var strikethrough: Bool = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            if let systemImage = systemImage {
-                Image(systemName: systemImage)
-                    .font(.system(size: 12, weight: .medium))
-            } else {
-                Text(label)
-                    .font(.system(size: 13, weight: font, design: .serif))
-            }
+            Text(label)
+                .font(.system(size: 13, weight: font, design: .serif))
+                .strikethrough(strikethrough)
         }
         .buttonStyle(.plain)
         .foregroundColor(Color(red: 0.35, green: 0.25, blue: 0.15))
         .frame(width: 28, height: 24)
         .background(Color(red: 0.92, green: 0.88, blue: 0.80).opacity(0.5))
         .cornerRadius(4)
+        .help(shortcut ?? "")
     }
 }
 
@@ -96,26 +82,36 @@ struct RichTextNSView: NSViewRepresentable {
     @Binding var text: String
     @Binding var showToolbar: Bool
 
+    private static let serifFont = NSFont(name: "Georgia", size: 15) ?? NSFont.systemFont(ofSize: 15)
+    private static let inkColor = NSColor(red: 0.20, green: 0.15, blue: 0.10, alpha: 1.0)
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSTextView.scrollableTextView()
-        guard let textView = scrollView.documentView as? NSTextView else {
-            return scrollView
-        }
+        let textStorage = NSTextStorage()
+        let layoutManager = NSLayoutManager()
+        textStorage.addLayoutManager(layoutManager)
+        let textContainer = NSTextContainer(size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
+        textContainer.widthTracksTextView = true
+        layoutManager.addTextContainer(textContainer)
 
+        let textView = FormattableTextView(frame: .zero, textContainer: textContainer)
         textView.delegate = context.coordinator
-        textView.font = NSFont(name: "Georgia", size: 15) ?? NSFont.systemFont(ofSize: 15)
-        textView.textColor = NSColor(red: 0.20, green: 0.15, blue: 0.10, alpha: 1.0)
+        textView.font = Self.serifFont
+        textView.textColor = Self.inkColor
         textView.backgroundColor = .clear
         textView.isRichText = true
         textView.allowsUndo = true
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.textContainerInset = NSSize(width: 0, height: 4)
+        textView.isVerticallyResizable = true
+        textView.autoresizingMask = [.width]
 
+        let scrollView = NSScrollView()
+        scrollView.documentView = textView
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
@@ -123,58 +119,67 @@ struct RichTextNSView: NSViewRepresentable {
         scrollView.backgroundColor = .clear
         scrollView.drawsBackground = false
 
-        loadContent(into: textView)
+        // Load markdown content
+        let attrStr = MarkdownConverter.attributedString(from: text, font: Self.serifFont, color: Self.inkColor)
+        textView.textStorage?.setAttributedString(attrStr)
+
+        // Listen for toolbar button notifications
+        context.coordinator.setupToolbarNotifications(textView: textView)
 
         return scrollView
     }
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
-        guard let textView = nsView.documentView as? NSTextView else { return }
+        guard let textView = nsView.documentView as? FormattableTextView else { return }
 
-        if !context.coordinator.isUserEditing && textView.string != text {
-            loadContent(into: textView)
-        }
-    }
-
-    private func loadContent(into textView: NSTextView) {
-        let inkColor = NSColor(red: 0.20, green: 0.15, blue: 0.10, alpha: 1.0)
-        let serifFont = NSFont(name: "Georgia", size: 15) ?? NSFont.systemFont(ofSize: 15)
-
-        if text.isEmpty {
-            textView.string = ""
-            textView.font = serifFont
-            textView.textColor = inkColor
-            return
-        }
-
-        if let attrStr = try? NSAttributedString(
-            markdown: text,
-            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        ) {
-            let mutable = NSMutableAttributedString(attributedString: attrStr)
-            let range = NSRange(location: 0, length: mutable.length)
-            mutable.addAttribute(.font, value: serifFont, range: range)
-            mutable.addAttribute(.foregroundColor, value: inkColor, range: range)
-            textView.textStorage?.setAttributedString(mutable)
-        } else {
-            textView.string = text
-            textView.font = serifFont
-            textView.textColor = inkColor
+        if !context.coordinator.isUserEditing {
+            let currentMarkdown = MarkdownConverter.markdown(from: textView.attributedString())
+            if currentMarkdown != text {
+                let attrStr = MarkdownConverter.attributedString(from: text, font: Self.serifFont, color: Self.inkColor)
+                textView.textStorage?.setAttributedString(attrStr)
+            }
         }
     }
 
     class Coordinator: NSObject, NSTextViewDelegate {
         var parent: RichTextNSView
         var isUserEditing = false
+        weak var currentTextView: FormattableTextView?
 
         init(_ parent: RichTextNSView) {
             self.parent = parent
         }
 
+        func setupToolbarNotifications(textView: FormattableTextView) {
+            currentTextView = textView
+
+            NotificationCenter.default.addObserver(forName: .richTextToggleBold, object: nil, queue: .main) { [weak self] _ in
+                guard let tv = self?.currentTextView else { return }
+                MarkdownConverter.toggleBold(in: tv, baseFont: RichTextNSView.serifFont)
+                self?.syncText(from: tv)
+            }
+            NotificationCenter.default.addObserver(forName: .richTextToggleItalic, object: nil, queue: .main) { [weak self] _ in
+                guard let tv = self?.currentTextView else { return }
+                MarkdownConverter.toggleItalic(in: tv, baseFont: RichTextNSView.serifFont)
+                self?.syncText(from: tv)
+            }
+            NotificationCenter.default.addObserver(forName: .richTextToggleStrikethrough, object: nil, queue: .main) { [weak self] _ in
+                guard let tv = self?.currentTextView else { return }
+                MarkdownConverter.toggleStrikethrough(in: tv)
+                self?.syncText(from: tv)
+            }
+        }
+
+        private func syncText(from textView: NSTextView) {
+            isUserEditing = true
+            parent.text = MarkdownConverter.markdown(from: textView.attributedString())
+            isUserEditing = false
+        }
+
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             isUserEditing = true
-            parent.text = textView.string
+            parent.text = MarkdownConverter.markdown(from: textView.attributedString())
             isUserEditing = false
         }
 
@@ -192,6 +197,10 @@ struct RichTextNSView: NSViewRepresentable {
                     self.parent.showToolbar = false
                 }
             }
+        }
+
+        deinit {
+            NotificationCenter.default.removeObserver(self)
         }
     }
 }

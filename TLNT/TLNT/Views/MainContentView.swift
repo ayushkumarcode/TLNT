@@ -621,28 +621,28 @@ struct ComposeBubbleView: NSViewRepresentable {
     let onSave: () -> Void
     let onCancel: () -> Void
 
+    private static let baseFont = NSFont.systemFont(ofSize: 13)
+    private static let textColor = NSColor.labelColor
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        // Build NSTextView manually to avoid scrollableTextView()'s word-wrap defaults
+        let textStorage = NSTextStorage()
+        let layoutManager = NSLayoutManager()
+        textStorage.addLayoutManager(layoutManager)
         let textContainer = NSTextContainer(size: NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude))
         textContainer.widthTracksTextView = false
         textContainer.heightTracksTextView = false
-
-        let layoutManager = NSLayoutManager()
         layoutManager.addTextContainer(textContainer)
 
-        let textStorage = NSTextStorage()
-        textStorage.addLayoutManager(layoutManager)
-
-        let textView = NSTextView(frame: .zero, textContainer: textContainer)
+        let textView = FormattableTextView(frame: .zero, textContainer: textContainer)
         textView.delegate = context.coordinator
-        textView.font = NSFont.systemFont(ofSize: 13)
-        textView.textColor = NSColor.labelColor
+        textView.font = Self.baseFont
+        textView.textColor = Self.textColor
         textView.backgroundColor = .clear
-        textView.isRichText = false
+        textView.isRichText = true
         textView.allowsUndo = true
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
@@ -661,24 +661,21 @@ struct ComposeBubbleView: NSViewRepresentable {
         scrollView.backgroundColor = .clear
         scrollView.drawsBackground = false
 
-        // Set initial text
+        // Load as plain text (compose starts empty typically)
         textView.string = text
 
-        // Make first responder
         DispatchQueue.main.async {
             textView.window?.makeFirstResponder(textView)
         }
 
-        // Monitor for clicks outside
         context.coordinator.startMonitoring(textView: textView)
 
         return scrollView
     }
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
-        guard let textView = nsView.documentView as? NSTextView else { return }
+        guard let textView = nsView.documentView as? FormattableTextView else { return }
 
-        // Only update text if it changed externally
         if textView.string != text && !context.coordinator.isUserEditing {
             textView.string = text
         }
@@ -701,17 +698,14 @@ struct ComposeBubbleView: NSViewRepresentable {
         func startMonitoring(textView: NSTextView) {
             currentTextView = textView
 
-            // Monitor local mouse events to detect clicks outside
             eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
                 guard let self = self, let textView = self.currentTextView else { return event }
 
-                // Check if click is outside the text view
                 if let window = textView.window {
                     let clickLocation = event.locationInWindow
                     let textViewFrame = textView.convert(textView.bounds, to: nil)
 
                     if !textViewFrame.contains(clickLocation) {
-                        // Click outside - save and dismiss
                         DispatchQueue.main.async {
                             self.saveAndDismiss()
                         }
@@ -731,6 +725,12 @@ struct ComposeBubbleView: NSViewRepresentable {
 
         func saveAndDismiss() {
             stopMonitoring()
+            // Convert attributed string to markdown before saving
+            if let textView = currentTextView {
+                isUserEditing = true
+                parent.text = MarkdownConverter.markdown(from: textView.attributedString())
+                isUserEditing = false
+            }
             let trimmed = parent.text.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmed.isEmpty {
                 parent.onSave()
@@ -742,13 +742,12 @@ struct ComposeBubbleView: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             isUserEditing = true
-            parent.text = textView.string
+            parent.text = MarkdownConverter.markdown(from: textView.attributedString())
             isUserEditing = false
         }
 
         func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
             if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
-                // Escape pressed - cancel
                 stopMonitoring()
                 parent.onCancel()
                 return true
@@ -789,7 +788,7 @@ struct SelectableNoteItemView: View {
                 if isEditing {
                     editableTextView
                 } else {
-                    Text(note.content)
+                    MarkdownTextView(content: note.content)
                         .font(.system(size: 13))
                         .foregroundColor(.primary)
                         .frame(maxWidth: .infinity, alignment: .leading)

@@ -127,7 +127,7 @@ struct TextNoteView: View {
     var onDoubleClick: (() -> Void)? = nil
 
     var body: some View {
-        Text(text)
+        MarkdownTextView(content: text)
             .font(.system(size: 13))
             .foregroundColor(.primary)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -146,25 +146,35 @@ struct EditableTextBubble: NSViewRepresentable {
     let onSave: () -> Void
     let onCancel: () -> Void
 
+    private static let baseFont = NSFont.systemFont(ofSize: 13)
+    private static let textColor = NSColor.labelColor
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSTextView.scrollableTextView()
-        guard let textView = scrollView.documentView as? NSTextView else {
-            return scrollView
-        }
+        let textStorage = NSTextStorage()
+        let layoutManager = NSLayoutManager()
+        textStorage.addLayoutManager(layoutManager)
+        let textContainer = NSTextContainer(size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
+        textContainer.widthTracksTextView = true
+        layoutManager.addTextContainer(textContainer)
 
+        let textView = FormattableTextView(frame: .zero, textContainer: textContainer)
         textView.delegate = context.coordinator
-        textView.font = NSFont.systemFont(ofSize: 13)
-        textView.textColor = NSColor.labelColor
+        textView.font = Self.baseFont
+        textView.textColor = Self.textColor
         textView.backgroundColor = .clear
-        textView.isRichText = false
+        textView.isRichText = true
         textView.allowsUndo = true
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
+        textView.isVerticallyResizable = true
+        textView.autoresizingMask = [.width]
 
+        let scrollView = NSScrollView()
+        scrollView.documentView = textView
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
@@ -172,29 +182,30 @@ struct EditableTextBubble: NSViewRepresentable {
         scrollView.backgroundColor = .clear
         scrollView.drawsBackground = false
 
-        // Set initial text
-        textView.string = text
+        // Load markdown into attributed string
+        let attrStr = MarkdownConverter.attributedString(from: text, font: Self.baseFont, color: Self.textColor)
+        textView.textStorage?.setAttributedString(attrStr)
 
-        // Make first responder
         DispatchQueue.main.async {
             textView.window?.makeFirstResponder(textView)
         }
 
-        // Monitor for clicks outside
         context.coordinator.startMonitoring(textView: textView)
 
         return scrollView
     }
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
-        guard let textView = nsView.documentView as? NSTextView else { return }
+        guard let textView = nsView.documentView as? FormattableTextView else { return }
 
-        // Only update text if it changed externally
-        if textView.string != text && !context.coordinator.isUserEditing {
-            textView.string = text
+        if !context.coordinator.isUserEditing {
+            let currentMarkdown = MarkdownConverter.markdown(from: textView.attributedString())
+            if currentMarkdown != text {
+                let attrStr = MarkdownConverter.attributedString(from: text, font: Self.baseFont, color: Self.textColor)
+                textView.textStorage?.setAttributedString(attrStr)
+            }
         }
 
-        // Update parent reference and ensure monitoring is active
         context.coordinator.parent = self
         if context.coordinator.eventMonitor == nil {
             context.coordinator.startMonitoring(textView: textView)
@@ -218,17 +229,14 @@ struct EditableTextBubble: NSViewRepresentable {
         func startMonitoring(textView: NSTextView) {
             currentTextView = textView
 
-            // Monitor local mouse events to detect clicks outside
             eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
                 guard let self = self, let textView = self.currentTextView else { return event }
 
-                // Check if click is outside the text view
                 if let window = textView.window {
                     let clickLocation = event.locationInWindow
                     let textViewFrame = textView.convert(textView.bounds, to: nil)
 
                     if !textViewFrame.contains(clickLocation) {
-                        // Click outside - save and dismiss
                         DispatchQueue.main.async {
                             self.saveAndDismiss()
                         }
@@ -248,6 +256,12 @@ struct EditableTextBubble: NSViewRepresentable {
 
         func saveAndDismiss() {
             stopMonitoring()
+            // Convert attributed string to markdown before saving
+            if let textView = currentTextView {
+                isUserEditing = true
+                parent.text = MarkdownConverter.markdown(from: textView.attributedString())
+                isUserEditing = false
+            }
             let trimmed = parent.text.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmed.isEmpty {
                 parent.onSave()
@@ -259,18 +273,27 @@ struct EditableTextBubble: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             isUserEditing = true
-            parent.text = textView.string
+            parent.text = MarkdownConverter.markdown(from: textView.attributedString())
             isUserEditing = false
         }
 
+        // Handle ⌘B, ⌘I, ⌘⇧X, Escape
         func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
             if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
-                // Escape pressed - cancel
                 stopMonitoring()
                 parent.onCancel()
                 return true
             }
             return false
+        }
+
+        func textView(_ textView: NSTextView, shouldChangeTextIn affectedCharRange: NSRange, replacementString: String?) -> Bool {
+            return true
+        }
+
+        // Intercept key events for ⌘⇧X (strikethrough)
+        func textView(_ textView: NSTextView, willChangeSelectionFromCharacterRange oldRange: NSRange, toCharacterRange newRange: NSRange) -> NSRange {
+            return newRange
         }
     }
 }
