@@ -22,6 +22,9 @@ struct JournalShelfView: View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(spacing: 0) {
+                    Spacer()
+                        .frame(height: 20)
+
                     let shelves = shelfRows()
                     ForEach(Array(shelves.enumerated()), id: \.offset) { index, shelfJournals in
                         shelfRow(journals: shelfJournals, shelfIndex: index, totalWidth: geometry.size.width)
@@ -34,7 +37,6 @@ struct JournalShelfView: View {
                 }
             }
             .background(shelfBackground)
-            .drawingGroup() // Metal-rendered for 60fps with Canvas-heavy shelf
         }
     }
 
@@ -110,24 +112,25 @@ struct JournalShelfView: View {
     private var addBookButton: some View {
         Button(action: { isCreatingJournal = true }) {
             ZStack {
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color(NSColor.controlBackgroundColor).opacity(0.3))
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(red: 0.25, green: 0.20, blue: 0.15).opacity(0.8))
                     .frame(width: bookSize.width, height: bookSize.height)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 3)
-                            .stroke(Color.secondary.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [5, 3]))
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(Color(red: 0.65, green: 0.55, blue: 0.40).opacity(0.5), style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
                     )
 
-                VStack(spacing: 8) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 24, weight: .light))
-                        .foregroundColor(.secondary.opacity(0.6))
+                VStack(spacing: 10) {
+                    Image(systemName: "plus.circle")
+                        .font(.system(size: 30, weight: .light))
+                        .foregroundColor(Color(red: 0.75, green: 0.65, blue: 0.48))
 
                     Text("New Journal")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.secondary.opacity(0.6))
+                        .font(.system(size: 11, weight: .medium, design: .serif))
+                        .foregroundColor(Color(red: 0.75, green: 0.65, blue: 0.48))
                 }
             }
+            .shadow(color: .black.opacity(0.3), radius: 4, x: 2, y: 2)
         }
         .buttonStyle(.plain)
         .rotation3DEffect(.degrees(-8), axis: (x: 0.1, y: 1, z: 0), perspective: 0.5)
@@ -145,9 +148,9 @@ struct JournalShelfView: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color(red: 0.30, green: 0.20, blue: 0.14),
-                            Color(red: 0.36, green: 0.25, blue: 0.17),
-                            Color(red: 0.30, green: 0.20, blue: 0.14),
+                            Color(red: 0.38, green: 0.26, blue: 0.18),
+                            Color(red: 0.45, green: 0.32, blue: 0.22),
+                            Color(red: 0.38, green: 0.26, blue: 0.18),
                         ],
                         startPoint: .leading,
                         endPoint: .trailing
@@ -179,8 +182,8 @@ struct JournalShelfView: View {
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color(red: 0.24, green: 0.16, blue: 0.10),
-                                Color(red: 0.20, green: 0.13, blue: 0.08),
+                                Color(red: 0.32, green: 0.22, blue: 0.14),
+                                Color(red: 0.26, green: 0.17, blue: 0.10),
                             ],
                             startPoint: .top,
                             endPoint: .bottom
@@ -203,18 +206,19 @@ struct JournalShelfView: View {
     private var shelfBackground: some View {
         LinearGradient(
             colors: [
+                Color(red: 0.22, green: 0.16, blue: 0.12),
+                Color(red: 0.18, green: 0.13, blue: 0.09),
                 Color(red: 0.15, green: 0.10, blue: 0.07),
-                Color(red: 0.12, green: 0.08, blue: 0.05),
             ],
             startPoint: .top,
             endPoint: .bottom
         )
         .overlay(
-            // Subtle vignette
+            // Subtle warm vignette
             RadialGradient(
-                colors: [Color.clear, Color.black.opacity(0.3)],
+                colors: [Color(red: 0.25, green: 0.18, blue: 0.12).opacity(0.3), Color.black.opacity(0.15)],
                 center: .center,
-                startRadius: 100,
+                startRadius: 150,
                 endRadius: 500
             )
         )
