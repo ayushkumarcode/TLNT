@@ -14,30 +14,35 @@ struct JournalBookView: View {
 
     @State private var pages: [JournalPage] = []
     @State private var currentPageIndex: Int = 0
+    @State private var coverRotation: Double = 0 // 0 = closed, -180 = fully open
+    @State private var isBookOpen = false
 
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Paper background
+                // Paper background (visible when book is open)
                 Color(red: 0.99, green: 0.97, blue: 0.91)
+                    .opacity(isBookOpen ? 1 : 0)
 
-                VStack(spacing: 0) {
-                    // Top bar with close button
-                    topBar
+                if isBookOpen {
+                    // Open book content
+                    VStack(spacing: 0) {
+                        topBar
 
-                    // Book spread
-                    HStack(spacing: 0) {
-                        // Left page (previous)
-                        leftPage(width: geometry.size.width * 0.5 - 20)
-
-                        // Spine
-                        spineCenter
-
-                        // Right page (current/active)
-                        rightPage(width: geometry.size.width * 0.5 - 20)
+                        HStack(spacing: 0) {
+                            leftPage(width: geometry.size.width * 0.5 - 20)
+                            spineCenter
+                            rightPage(width: geometry.size.width * 0.5 - 20)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.bottom, 10)
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.bottom, 10)
+                    .transition(.opacity)
+                }
+
+                // Cover (animates open)
+                if !isBookOpen {
+                    coverAnimation(geometry: geometry)
                 }
             }
         }
@@ -47,6 +52,16 @@ struct JournalBookView: View {
                 let page = journalStore.addPage(to: journal.id)
                 pages = [page]
             }
+
+            // Animate the cover opening
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.82).delay(0.1)) {
+                coverRotation = -180
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isBookOpen = true
+                }
+            }
         }
     }
 
@@ -54,7 +69,7 @@ struct JournalBookView: View {
 
     private var topBar: some View {
         HStack {
-            Button(action: onClose) {
+            Button(action: closeBook) {
                 HStack(spacing: 4) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 12, weight: .semibold))
@@ -281,6 +296,40 @@ struct JournalBookView: View {
         pages = journalStore.loadPages(for: journal.id)
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             currentPageIndex = pages.count - 1
+        }
+    }
+
+    // MARK: - Cover Animation
+
+    private func coverAnimation(geometry: GeometryProxy) -> some View {
+        ZStack {
+            // First page preview behind the cover
+            paperBackground
+                .frame(width: geometry.size.width * 0.5, height: geometry.size.height * 0.85)
+                .position(x: geometry.size.width * 0.5, y: geometry.size.height * 0.5)
+
+            // The cover that rotates open
+            BookCoverView(journal: journal, size: CGSize(width: geometry.size.width * 0.45, height: geometry.size.height * 0.85))
+                .rotation3DEffect(
+                    .degrees(coverRotation),
+                    axis: (x: 0, y: 1, z: 0),
+                    anchor: .leading,
+                    perspective: 0.4
+                )
+                .position(x: geometry.size.width * 0.5, y: geometry.size.height * 0.5)
+        }
+    }
+
+    private func closeBook() {
+        // First close the cover
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isBookOpen = false
+        }
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) {
+            coverRotation = 0
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            onClose()
         }
     }
 }
