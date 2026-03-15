@@ -81,6 +81,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupHotkeys()
         TLNTLogger.success("Hotkeys setup complete", category: TLNTLogger.hotkey)
 
+        // Setup zoom keyboard shortcuts (⌘+, ⌘-, ⌘0)
+        setupZoomKeyMonitor()
+
         // Show onboarding if first launch
         if !UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") {
             TLNTLogger.info("First launch detected, showing onboarding", category: TLNTLogger.app)
@@ -247,6 +250,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         TLNTLogger.info("=== captureText END ===", category: TLNTLogger.text)
+    }
+
+    // MARK: - Zoom Key Monitor
+
+    private func setupZoomKeyMonitor() {
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let zoomStore = self?.zoomStore else { return event }
+
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            guard flags == .command else { return event }
+
+            let key = event.charactersIgnoringModifiers ?? ""
+
+            if key == "=" || key == "+" {
+                zoomStore.zoomIn()
+                return nil
+            }
+            if key == "-" {
+                zoomStore.zoomOut()
+                return nil
+            }
+            if key == "0" {
+                zoomStore.resetZoom()
+                return nil
+            }
+
+            return event
+        }
     }
 
     // MARK: - Toast

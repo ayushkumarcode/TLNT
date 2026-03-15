@@ -6,42 +6,39 @@
 //
 
 import Foundation
+import Combine
 
 class ZoomStore: ObservableObject {
     static let minZoom: CGFloat = 0.5
     static let maxZoom: CGFloat = 2.0
     static let step: CGFloat = 0.1
 
-    @Published var level: CGFloat {
-        didSet {
-            level = max(Self.minZoom, min(Self.maxZoom, level))
-            UserDefaults.standard.set(Double(level), forKey: "tlnt_zoomLevel")
-        }
-    }
+    @Published var level: CGFloat = 1.0
 
     init() {
         let saved = UserDefaults.standard.double(forKey: "tlnt_zoomLevel")
-        self.level = saved > 0 ? CGFloat(saved) : 1.0
+        if saved > 0 {
+            self.level = max(Self.minZoom, min(Self.maxZoom, CGFloat(saved)))
+        }
     }
 
     func zoomIn() {
-        withMutations {
-            level = min(level + Self.step, Self.maxZoom)
-        }
+        let newLevel = min(level + Self.step, Self.maxZoom)
+        setLevel(newLevel)
     }
 
     func zoomOut() {
-        withMutations {
-            level = max(level - Self.step, Self.minZoom)
-        }
+        let newLevel = max(level - Self.step, Self.minZoom)
+        setLevel(newLevel)
     }
 
     func resetZoom() {
-        level = 1.0
+        setLevel(1.0)
     }
 
-    private func withMutations(_ body: () -> Void) {
-        objectWillChange.send()
-        body()
+    private func setLevel(_ newLevel: CGFloat) {
+        let clamped = max(Self.minZoom, min(Self.maxZoom, newLevel))
+        level = clamped
+        UserDefaults.standard.set(Double(clamped), forKey: "tlnt_zoomLevel")
     }
 }

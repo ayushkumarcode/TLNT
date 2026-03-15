@@ -87,43 +87,6 @@ struct RootContentView: View {
             .animation(.spring(response: 0.4, dampingFraction: 0.82), value: openedJournal?.id)
         }
         .frame(minWidth: 500, minHeight: 400)
-        .onAppear {
-            setupZoomKeyMonitor()
-        }
-    }
-
-    // MARK: - Zoom Key Monitor (⌘+, ⌘-, ⌘0)
-
-    private func setupZoomKeyMonitor() {
-        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [self] event in
-            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-            guard flags == .command else { return event }
-
-            let key = event.charactersIgnoringModifiers ?? ""
-
-            if key == "=" || key == "+" {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    zoomStore.zoomIn()
-                }
-                return nil // consumed
-            }
-
-            if key == "-" {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    zoomStore.zoomOut()
-                }
-                return nil
-            }
-
-            if key == "0" {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    zoomStore.resetZoom()
-                }
-                return nil
-            }
-
-            return event
-        }
     }
 
     // MARK: - Mode Toggle
