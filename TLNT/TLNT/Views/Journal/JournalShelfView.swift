@@ -34,6 +34,7 @@ struct JournalShelfView: View {
                 }
             }
             .background(shelfBackground)
+            .drawingGroup() // Metal-rendered for 60fps with Canvas-heavy shelf
         }
     }
 

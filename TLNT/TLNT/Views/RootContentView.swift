@@ -34,7 +34,10 @@ struct RootContentView: View {
                 switch appModeStore.activeMode {
                 case .quickNotes:
                     MainContentView(noteStore: noteStore, tabStore: tabStore)
-                        .transition(.opacity.combined(with: .move(edge: .leading)))
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.98)).combined(with: .move(edge: .leading)),
+                            removal: .opacity.combined(with: .scale(scale: 0.98))
+                        ))
                 case .journal:
                     if let journal = openedJournal {
                         JournalBookView(
@@ -53,7 +56,10 @@ struct RootContentView: View {
                                 openedJournal = journal
                             }
                         }
-                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.98)).combined(with: .move(edge: .trailing)),
+                            removal: .opacity.combined(with: .scale(scale: 0.98))
+                        ))
                     }
                 }
             }
