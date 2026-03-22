@@ -13,43 +13,14 @@ enum ScreenshotLocator {
     static func getScreenshotFolder() -> URL {
         TLNTLogger.debug("getScreenshotFolder() called", category: TLNTLogger.screenshot)
 
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
-        task.arguments = ["read", "com.apple.screencapture", "location"]
-
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = Pipe() // Suppress errors
-
-        TLNTLogger.debug("Running defaults read com.apple.screencapture location...", category: TLNTLogger.screenshot)
-
-        do {
-            try task.run()
-            task.waitUntilExit()
-
-            TLNTLogger.debug("defaults command completed with exit code: \(task.terminationStatus)", category: TLNTLogger.screenshot)
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            if let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-               !path.isEmpty {
-                TLNTLogger.debug("Raw path from defaults: '\(path)'", category: TLNTLogger.screenshot)
-
-                var url = URL(fileURLWithPath: path)
-
-                // Expand ~ if needed
-                if path.hasPrefix("~") {
-                    let expanded = NSString(string: path).expandingTildeInPath
-                    url = URL(fileURLWithPath: expanded)
-                    TLNTLogger.debug("Expanded tilde path to: '\(expanded)'", category: TLNTLogger.screenshot)
-                }
-
-                TLNTLogger.success("Screenshot folder: \(url.path)", category: TLNTLogger.screenshot)
-                return url
-            } else {
-                TLNTLogger.warning("defaults returned empty or no path", category: TLNTLogger.screenshot)
-            }
-        } catch {
-            TLNTLogger.error("Failed to run defaults command: \(error)", category: TLNTLogger.screenshot)
+        // Read com.apple.screencapture preferences without spawning a process (sandbox-safe)
+        if let path = UserDefaults(suiteName: "com.apple.screencapture")?.string(forKey: "location"),
+           !path.isEmpty {
+            TLNTLogger.debug("Raw path from screencapture prefs: '\(path)'", category: TLNTLogger.screenshot)
+            let expanded = NSString(string: path).expandingTildeInPath
+            let url = URL(fileURLWithPath: expanded)
+            TLNTLogger.success("Screenshot folder: \(url.path)", category: TLNTLogger.screenshot)
+            return url
         }
 
         // Default to Desktop
