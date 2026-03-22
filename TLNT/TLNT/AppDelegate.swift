@@ -10,6 +10,10 @@ import SwiftUI
 import HotKey
 import CoreSpotlight
 
+extension Notification.Name {
+    static let tlntNewNote = Notification.Name("TLNTNewNote")
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Properties
@@ -28,6 +32,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var textCaptureService: TextCaptureService!
     private var hotkeyManager: HotkeyManager!
     private var spotlightIndexer: SpotlightIndexer!
+    private var whisperedThoughtsService: WhisperedThoughtsService!
 
     // MARK: - App Lifecycle
 
@@ -57,6 +62,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         TLNTLogger.success("JournalStore initialized", category: TLNTLogger.storage)
 
         zoomStore = ZoomStore()
+
+        TLNTLogger.debug("Initializing WhisperedThoughtsService...", category: TLNTLogger.app)
+        whisperedThoughtsService = WhisperedThoughtsService(journalStore: journalStore)
+        TLNTLogger.success("WhisperedThoughtsService initialized", category: TLNTLogger.app)
 
         TLNTLogger.debug("Initializing SpotlightIndexer...", category: TLNTLogger.spotlight)
         spotlightIndexer = SpotlightIndexer()
@@ -185,7 +194,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         if mainWindowController == nil {
             TLNTLogger.debug("Creating new MainWindowController...", category: TLNTLogger.ui)
-            mainWindowController = MainWindowController(noteStore: noteStore, tabStore: tabStore, appModeStore: appModeStore, journalStore: journalStore, zoomStore: zoomStore)
+            mainWindowController = MainWindowController(noteStore: noteStore, tabStore: tabStore, appModeStore: appModeStore, journalStore: journalStore, zoomStore: zoomStore, whisperedThoughtsService: whisperedThoughtsService)
             TLNTLogger.debug("MainWindowController created", category: TLNTLogger.ui)
         }
 
@@ -256,7 +265,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupZoomKeyMonitor() {
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let zoomStore = self?.zoomStore else { return event }
+            guard let self = self, let zoomStore = self.zoomStore else { return event }
 
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             guard flags == .command else { return event }
@@ -273,6 +282,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             if key == "0" {
                 zoomStore.resetZoom()
+                return nil
+            }
+            if key == "t" && self.appModeStore.activeMode == .quickNotes {
+                self.openTLNT()
+                NotificationCenter.default.post(name: .tlntNewNote, object: nil)
                 return nil
             }
 

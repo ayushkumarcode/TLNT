@@ -43,7 +43,24 @@ class FormattableTextView: NSTextView {
         super.keyDown(with: event)
     }
 
+    // MARK: - Intrinsic Size (enables auto-height when not in a scroll view)
+
+    override var intrinsicContentSize: NSSize {
+        guard let layoutManager = layoutManager, let container = textContainer else {
+            return super.intrinsicContentSize
+        }
+        layoutManager.ensureLayout(for: container)
+        let height = layoutManager.usedRect(for: container).height + textContainerInset.height * 2
+        return NSSize(width: NSView.noIntrinsicMetric, height: max(20, height))
+    }
+
+    override func didChangeText() {
+        super.didChangeText()
+        invalidateIntrinsicContentSize()
+    }
+
     private func notifyChange() {
+        invalidateIntrinsicContentSize()
         delegate?.textDidChange?(Notification(name: NSText.didChangeNotification, object: self))
     }
 }

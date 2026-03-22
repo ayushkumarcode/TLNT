@@ -111,6 +111,11 @@ struct MainContentView: View {
                 batchActionBar
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .tlntNewNote)) { _ in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                isComposing = true
+            }
+        }
     }
 
     // MARK: - Batch Action Bar
@@ -901,7 +906,7 @@ struct SelectableNoteItemView: View {
                 editText = ""
             }
         )
-        .frame(minHeight: 60)
+        .frame(maxWidth: .infinity, minHeight: 60)
         .padding(12)
     }
 

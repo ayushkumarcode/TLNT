@@ -89,7 +89,7 @@ struct NoteItemView: View {
                 editText = ""
             }
         )
-        .frame(minHeight: 60)
+        .frame(maxWidth: .infinity, minHeight: 60)
         .padding(12)
     }
 
@@ -153,7 +153,7 @@ struct EditableTextBubble: NSViewRepresentable {
         Coordinator(self)
     }
 
-    func makeNSView(context: Context) -> NSScrollView {
+    func makeNSView(context: Context) -> FormattableTextView {
         let textStorage = NSTextStorage()
         let layoutManager = NSLayoutManager()
         textStorage.addLayoutManager(layoutManager)
@@ -171,17 +171,9 @@ struct EditableTextBubble: NSViewRepresentable {
         textView.allowsUndo = true
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
+        textView.isHorizontallyResizable = false
         textView.isVerticallyResizable = true
         textView.autoresizingMask = [.width]
-
-        let scrollView = NSScrollView()
-        scrollView.documentView = textView
-        scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = false
-        scrollView.autohidesScrollers = true
-        scrollView.borderType = .noBorder
-        scrollView.backgroundColor = .clear
-        scrollView.drawsBackground = false
 
         // Load markdown into attributed string
         let attrStr = MarkdownConverter.attributedString(from: text, font: Self.baseFont, color: Self.textColor)
@@ -193,23 +185,22 @@ struct EditableTextBubble: NSViewRepresentable {
 
         context.coordinator.startMonitoring(textView: textView)
 
-        return scrollView
+        return textView
     }
 
-    func updateNSView(_ nsView: NSScrollView, context: Context) {
-        guard let textView = nsView.documentView as? FormattableTextView else { return }
-
+    func updateNSView(_ nsView: FormattableTextView, context: Context) {
         if !context.coordinator.isUserEditing {
-            let currentMarkdown = MarkdownConverter.markdown(from: textView.attributedString())
+            let currentMarkdown = MarkdownConverter.markdown(from: nsView.attributedString())
             if currentMarkdown != text {
                 let attrStr = MarkdownConverter.attributedString(from: text, font: Self.baseFont, color: Self.textColor)
-                textView.textStorage?.setAttributedString(attrStr)
+                nsView.textStorage?.setAttributedString(attrStr)
+                nsView.invalidateIntrinsicContentSize()
             }
         }
 
         context.coordinator.parent = self
         if context.coordinator.eventMonitor == nil {
-            context.coordinator.startMonitoring(textView: textView)
+            context.coordinator.startMonitoring(textView: nsView)
         }
     }
 
